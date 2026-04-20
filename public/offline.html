@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Offline — Relish Business Suite</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{
+      font-family:'DM Sans',system-ui,-apple-system,sans-serif;
+      background:#F4F2EE;
+      color:#1C1B18;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:100vh;
+      padding:2rem;
+      text-align:center;
+    }
+    .card{
+      background:#FFFFFF;
+      border:1px solid #D8D5CE;
+      border-radius:12px;
+      padding:3rem 2rem;
+      max-width:420px;
+      width:100%;
+      box-shadow:0 1px 3px rgba(0,0,0,0.06);
+    }
+    .icon{
+      font-size:3rem;
+      margin-bottom:1rem;
+    }
+    h1{
+      font-family:'DM Serif Display',Georgia,serif;
+      font-size:1.5rem;
+      color:#0B2A4A;
+      margin-bottom:0.5rem;
+    }
+    p{
+      color:#5C5A55;
+      font-size:0.95rem;
+      line-height:1.6;
+      margin-bottom:1.5rem;
+    }
+    button{
+      background:#0D6E56;
+      color:#fff;
+      border:none;
+      border-radius:8px;
+      padding:0.75rem 1.5rem;
+      font-size:0.95rem;
+      font-family:inherit;
+      cursor:pointer;
+      transition:background 0.15s;
+    }
+    button:hover{background:#0a5a46}
+    button:active{background:#084a3a}
+    .brand{
+      margin-top:2rem;
+      font-size:0.8rem;
+      color:#5C5A55;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📡</div>
+    <h1>You're Offline</h1>
+    <p>
+      Relish Business Suite needs an internet connection
+      to load data from the server. Please check your
+      connection and try again.
+    </p>
+    <button onclick="window.location.reload()">
+      Try Again
+    </button>
+    <div class="brand">Relish Business Suite</div>
+  </div>
+</body>
+</html>

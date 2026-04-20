@@ -1,0 +1,31 @@
+:root {
+  /* ─── Brand Colors ──────────────────────── */
+  --navy: #0B2A4A;
+  --teal: #0D6E56;
+  --amber: #C47B1A;
+
+  /* ─── Surface Colors ────────────────────── */
+  --bg: #F4F2EE;
+  --surface: #FFFFFF;
+  --border: #D8D5CE;
+
+  /* ─── Text Colors ───────────────────────── */
+  --text: #1C1B18;
+  --text-muted: #5C5A55;
+
+  /* ─── Status Colors ─────────────────────── */
+  --success: #16A34A;
+  --warning: #D97706;
+  --error: #DC2626;
+  --info: #2563EB;
+
+  /* ─── Fonts ─────────────────────────────── */
+  --font-heading: 'DM Serif Display', serif;
+  --font-body: 'DM Sans', sans-serif;
+
+  /* ─── Layout ────────────────────────────── */
+  --radius: 8px;
+  --radius-lg: 12px;
+  --sidebar-width: 240px;
+  --header-height: 56px;
+}
