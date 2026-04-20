@@ -1,7 +1,7 @@
 import { useAuth } from '../../hooks/useAuth';
 import useOnlineStatus from '../../hooks/useOnlineStatus';
 
-export default function Header() {
+export default function Header({ onMenuToggle }) {
   const { profile, companies, activeCompany, setActiveCompany, signOut } = useAuth();
   const isOnline = useOnlineStatus();
 
@@ -20,6 +20,10 @@ export default function Header() {
       )}
 
       <div className="app-header__inner">
+        {/* Mobile hamburger */}
+        <button className="btn-ghost app-header__hamburger" onClick={onMenuToggle} aria-label="Toggle menu">
+          ☰
+        </button>
         {/* Company switcher (only when more than one company) */}
         {companies.length > 1 && (
           <select

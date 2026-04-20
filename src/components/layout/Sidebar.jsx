@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   { to: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 
-export default function Sidebar({ collapsed, onToggle }) {
+export default function Sidebar({ collapsed, mobileOpen, onToggle, onMobileClose }) {
   const { profile } = useAuth();
   const location = useLocation();
 
@@ -22,7 +22,7 @@ export default function Sidebar({ collapsed, onToggle }) {
   });
 
   return (
-    <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
+    <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}${mobileOpen ? ' sidebar--mobile-open' : ''}`}>
       {/* Logo + Brand */}
       <div className="sidebar__brand">
         <img src={relishLogo} alt="Relish" className="sidebar__logo" />
@@ -46,6 +46,7 @@ export default function Sidebar({ collapsed, onToggle }) {
               `sidebar__link${isActive || location.pathname.startsWith(item.to) ? ' sidebar__link--active' : ''}`
             }
             title={collapsed ? item.label : undefined}
+            onClick={onMobileClose}
           >
             <span className="sidebar__icon">{item.icon}</span>
             {!collapsed && <span className="sidebar__label">{item.label}</span>}
