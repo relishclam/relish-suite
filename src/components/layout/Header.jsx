@@ -1,9 +1,13 @@
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import useOnlineStatus from '../../hooks/useOnlineStatus';
 
 export default function Header({ onMenuToggle }) {
   const { profile, companies, activeCompany, setActiveCompany, signOut } = useAuth();
   const isOnline = useOnlineStatus();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isOnDashboard = location.pathname === '/dashboard';
 
   const handleCompanyChange = (e) => {
     const selected = companies.find((c) => c.id === e.target.value);
@@ -24,6 +28,14 @@ export default function Header({ onMenuToggle }) {
         <button className="btn-ghost app-header__hamburger" onClick={onMenuToggle} aria-label="Toggle menu">
           ☰
         </button>
+
+        {/* Home / Dashboard button — shown on all screens except dashboard */}
+        {!isOnDashboard && (
+          <button className="btn-ghost app-header__home" onClick={() => navigate('/dashboard')} aria-label="Go to Dashboard" title="Dashboard">
+            🏠
+          </button>
+        )}
+
         {/* Company switcher (only when more than one company) */}
         {companies.length > 1 && (
           <select

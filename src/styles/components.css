@@ -417,6 +417,12 @@
   font-size: 0.8125rem;
   font-weight: 600;
 }
+.app-header__home {
+  font-size: 1.125rem;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  line-height: 1;
+}
 .app-header__company-name {
   font-weight: 600;
   font-size: 0.875rem;
