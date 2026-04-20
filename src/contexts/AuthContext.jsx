@@ -13,6 +13,7 @@ export function AuthProvider({ children }) {
 
   // ─── Fetch profile + companies for a user ──────────────
   const fetchUserData = useCallback(async (userId) => {
+    if (!supabase) return;
     try {
       // Fetch profile
       const { data: profileData, error: profileError } = await supabase
@@ -78,6 +79,7 @@ export function AuthProvider({ children }) {
 
   // ─── Sign in with email + password ─────────────────────
   const signIn = useCallback(async (email, password) => {
+    if (!supabase) throw new Error('Supabase not configured');
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -89,6 +91,11 @@ export function AuthProvider({ children }) {
   // ─── Sign out ──────────────────────────────────────────
   const signOut = useCallback(async () => {
     localStorage.removeItem('relish_active_company');
+    if (!supabase) {
+      setSession(null); setUser(null); setProfile(null);
+      setCompanies([]); setActiveCompanyState(null);
+      return;
+    }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     setSession(null);
@@ -133,6 +140,11 @@ export function AuthProvider({ children }) {
     let mounted = true;
 
     // Get initial session
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       if (!mounted) return;
       setSession(initialSession);

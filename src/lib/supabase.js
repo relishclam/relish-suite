@@ -13,13 +13,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Suite Supabase credentials missing — app will not function');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-  },
-});
+export const supabase = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+    })
+  : null;
 
 // ─── Document Issue Address (Head Office, Alappuzha) ────
 // All POs, Proformas, and Commercial Invoices for BOTH
