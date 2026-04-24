@@ -1,5 +1,7 @@
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import logoApprovals from '../assets/logo-approvals.png';
+import logoClamFlow from '../assets/logo-clamflow.png';
 
 const QUICK_LINKS = [
   { to: '/purchase-orders', label: 'Purchase Orders', icon: '📋', desc: 'Create and manage POs' },
@@ -10,13 +12,37 @@ const QUICK_LINKS = [
   { to: '/settings', label: 'Settings', icon: '⚙️', desc: 'Your account preferences' },
 ];
 
+// External app shortcuts — read-only links, no data written to these apps
+const EXTERNAL_APPS = [
+  {
+    href: 'https://relishvoucher.vercel.app/',
+    label: 'Relish Approvals',
+    desc: 'Payment voucher approvals',
+    logo: logoApprovals,
+    roles: ['super_admin', 'admin', 'accounts'],
+  },
+  {
+    href: 'https://clamflowcloud.vercel.app/login',
+    label: 'ClamFlow',
+    desc: 'Processing plant operations',
+    logo: logoClamFlow,
+    requiresClamFlow: true,
+  },
+];
+
 export default function Dashboard() {
-  const { profile, activeCompany } = useAuth();
+  const { profile, activeCompany, canAccessClamFlow } = useAuth();
   const navigate = useNavigate();
 
   const visible = QUICK_LINKS.filter((l) => {
     if (!l.roles) return true;
     return l.roles.includes(profile?.role);
+  });
+
+  const visibleExternal = EXTERNAL_APPS.filter((app) => {
+    if (app.requiresClamFlow) return canAccessClamFlow();
+    if (app.roles) return app.roles.includes(profile?.role);
+    return true;
   });
 
   return (
@@ -35,6 +61,26 @@ export default function Dashboard() {
           </button>
         ))}
       </div>
+
+      {visibleExternal.length > 0 && (
+        <>
+          <p className="dash-section-label">Other Apps</p>
+          <div className="dash-grid">
+            {visibleExternal.map((app) => (
+              <a
+                key={app.href}
+                href={app.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="dash-card dash-card--external"
+              >
+                <img src={app.logo} alt={app.label} className="dash-card__app-logo" />
+                <span className="dash-card__desc">{app.desc} ↗</span>
+              </a>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

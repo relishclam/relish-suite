@@ -1814,6 +1814,31 @@
   font-size: 0.75rem;
   color: var(--text-muted);
 }
+.dash-card--external {
+  text-decoration: none;
+  color: inherit;
+  border-top: 3px solid var(--teal);
+  align-items: center;
+}
+.dash-card--external:hover {
+  border-color: var(--teal);
+  box-shadow: 0 2px 8px rgba(13, 110, 86, 0.12);
+}
+.dash-card__app-logo {
+  width: 100%;
+  max-width: 140px;
+  height: auto;
+  object-fit: contain;
+  margin-bottom: 0.25rem;
+}
+.dash-section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 1.5rem 0 0.75rem;
+}
 
 /* ════════════════════════════════════════════════════════════
    SETTINGS
