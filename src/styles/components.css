@@ -718,10 +718,11 @@
   margin-bottom: 1.5rem;
 }
 .login-logo {
-  width: 56px;
-  height: 56px;
+  display: block;
+  margin: 0 auto 0.75rem;
+  width: 67px;
+  height: 67px;
   object-fit: contain;
-  margin-bottom: 0.75rem;
 }
 .login-title {
   font-family: var(--font-heading);
