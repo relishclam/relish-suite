@@ -3,13 +3,15 @@ import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import logoApprovals from '../assets/logo-approvals.png';
 import logoClamFlow from '../assets/logo-clamflow.png';
+import logoDocs from '../assets/Docs_Logo.png';
+import logoSettings from '../assets/Settings_Logo.png';
 
 const TABS = [
   {
     id: 'docs',
     label: 'Relish Docs',
     desc: 'Purchase Orders & Invoices',
-    icon: '📑',
+    logo: logoDocs,
     links: [
       { to: '/purchase-orders', label: 'Purchase Orders', icon: '📋', desc: 'Create and manage POs' },
       { to: '/invoices', label: 'Invoices', icon: '📄', desc: 'Proforma & commercial invoices' },
@@ -19,7 +21,7 @@ const TABS = [
     id: 'settings',
     label: 'Relish Settings',
     desc: 'Tools & configurations',
-    icon: '⚙️',
+    logo: logoSettings,
     links: [
       { to: '/tally-export', label: 'Tally Export', icon: '💼', desc: 'Export vouchers to Tally', roles: ['super_admin', 'admin', 'accounts'] },
       { to: '/master-data', label: 'Master Data', icon: '🗂️', desc: 'Vendors, buyers, products' },
@@ -50,7 +52,8 @@ const EXTERNAL_APPS = [
 export default function Dashboard() {
   const { profile, activeCompany, canAccessClamFlow } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('docs');
+  // null = all collapsed; click same tab to collapse, different tab to switch
+  const [openTab, setOpenTab] = useState(null);
 
   const filterLinks = (links) =>
     links.filter((l) => {
@@ -66,8 +69,9 @@ export default function Dashboard() {
     return true;
   });
 
-  const currentTab = visibleTabs.find((t) => t.id === activeTab) ?? visibleTabs[0];
-  const currentLinks = currentTab ? filterLinks(currentTab.links) : [];
+  const handleTabClick = (id) => setOpenTab((prev) => (prev === id ? null : id));
+
+  const openLinks = openTab ? filterLinks(visibleTabs.find((t) => t.id === openTab)?.links ?? []) : [];
 
   return (
     <div className="dash-page">
@@ -76,27 +80,27 @@ export default function Dashboard() {
         {activeCompany && <p className="text-muted">{activeCompany.name} ({activeCompany.short_name})</p>}
       </div>
 
-      {/* Tab headers — styled like external app cards */}
+      {/* Tab cards with logos — click to expand/collapse */}
       <div className="dash-tabs">
         {visibleTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            className={`dash-tab${currentTab?.id === tab.id ? ' dash-tab--active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
+            className={`dash-tab${openTab === tab.id ? ' dash-tab--active' : ''}`}
+            onClick={() => handleTabClick(tab.id)}
+            aria-expanded={openTab === tab.id}
           >
-            <span className="dash-tab__icon">{tab.icon}</span>
-            <span className="dash-tab__label">{tab.label}</span>
-            <span className="dash-tab__desc">{tab.desc}</span>
+            <img src={tab.logo} alt={tab.label} className="dash-tab__logo" />
+            <span className="dash-tab__desc">{tab.desc} {openTab === tab.id ? '▲' : '▼'}</span>
           </button>
         ))}
       </div>
 
-      {/* Tab content */}
-      {currentLinks.length > 0 && (
+      {/* Collapsible panel */}
+      {openTab && openLinks.length > 0 && (
         <div className="dash-tab-panel">
           <div className="dash-grid">
-            {currentLinks.map((link) => (
+            {openLinks.map((link) => (
               <button key={link.to} type="button" className="dash-card" onClick={() => navigate(link.to)}>
                 <span className="dash-card__icon">{link.icon}</span>
                 <span className="dash-card__label">{link.label}</span>
