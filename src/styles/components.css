@@ -1832,6 +1832,58 @@
   object-fit: contain;
   margin-bottom: 0.25rem;
 }
+.dash-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 0;
+}
+.dash-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 1.25rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  text-align: center;
+  transition: box-shadow 0.15s, border-color 0.15s, border-top-color 0.15s;
+}
+.dash-tab:hover {
+  border-top-color: var(--teal);
+  box-shadow: 0 2px 8px rgba(13, 110, 86, 0.1);
+}
+.dash-tab--active {
+  border-top: 3px solid var(--teal);
+  box-shadow: 0 2px 8px rgba(13, 110, 86, 0.12);
+}
+.dash-tab__icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.125rem;
+}
+.dash-tab__label {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--text);
+}
+.dash-tab__desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.dash-tab-panel {
+  margin-top: 1rem;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.dash-tab-panel .dash-grid {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
 .dash-section-label {
   font-size: 0.75rem;
   font-weight: 600;
