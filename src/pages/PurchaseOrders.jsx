@@ -36,7 +36,7 @@ const fmt = (v) =>
   });
 
 export default function PurchaseOrders() {
-  const { activeCompany, hasRole } = useAuth();
+  const { activeCompany, permissions } = useAuth();
   const navigate = useNavigate();
   const addToast = useToast();
 
@@ -47,7 +47,7 @@ export default function PurchaseOrders() {
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const canEdit = hasRole(['super_admin', 'admin', 'operations']);
+  const canEdit = permissions.canCreatePO;
 
   const loadOrders = useCallback(async () => {
     if (!activeCompany) return;
@@ -153,7 +153,7 @@ export default function PurchaseOrders() {
                 >
                   <td className="po-table__number">{po.po_number}</td>
                   <td>{po.po_date || '—'}</td>
-                  <td>{po.vendors?.name || '—'}</td>
+                  <td>{po.vendor_name || '—'}</td>
                   <td>
                     <span className={`badge ${STATUS_COLORS[po.status] || ''}`}>
                       {STATUS_LABELS[po.status] || po.status}

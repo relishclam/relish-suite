@@ -1,24 +1,59 @@
-import { createContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { getPermissions } from '../lib/permissions';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(null);
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [companies, setCompanies] = useState([]);
+  const [session, setSession]                  = useState(null);
+  const [user, setUser]                        = useState(null);
+  const [profile, setProfile]                  = useState(null);
+  const [companyUsers, setCompanyUsers]        = useState([]);
   const [activeCompany, setActiveCompanyState] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]                  = useState(true);
 
-  // ─── Fetch profile + companies for a user ──────────────
+  // ─── Derived: companies array (backward compat — Header + ProtectedRoute)
+  const companies = useMemo(
+    () => companyUsers.map((cu) => cu.company).filter(Boolean),
+    [companyUsers]
+  );
+
+  // ─── Derived: active role
+  // profile.is_super_admin = true  → synthetic 'super_admin' (all permissions)
+  // otherwise                      → role from matching company_users row
+  const activeRole = useMemo(() => {
+    if (!profile) return null;
+    if (profile.is_super_admin) return 'super_admin';
+    const activeCu = companyUsers.find((cu) => cu.company_id === activeCompany?.id);
+    return activeCu?.role ?? null;
+  }, [profile, companyUsers, activeCompany]);
+
+  // ─── Derived: permission object
+  const permissions = useMemo(() => getPermissions(activeRole), [activeRole]);
+
+  // ─── Fetch profile + company assignments ────────────────────────
   const fetchUserData = useCallback(async (userId) => {
     if (!supabase) return;
     try {
-      // Fetch profile
+      // 1. App access check
+      const { data: accessRow } = await supabase
+        .schema('registry')
+        .from('app_access')
+        .select('can_access')
+        .eq('user_id', userId)
+        .eq('app', 'suite')
+        .maybeSingle();
+
+      if (accessRow && accessRow.can_access === false) {
+        await supabase.auth.signOut();
+        return;
+      }
+
+      // 2. Fetch registry.profiles (no role column)
       const { data: profileData, error: profileError } = await supabase
+        .schema('registry')
         .from('profiles')
-        .select('id, email, full_name, role, is_active')
+        .select('id, full_name, email, mobile, is_super_admin, is_active, entity_id')
         .eq('id', userId)
         .single();
 
@@ -27,47 +62,54 @@ export function AuthProvider({ children }) {
         await supabase.auth.signOut();
         return;
       }
-
       setProfile(profileData);
 
-      // Fetch companies the user has access to
-      let companyData = [];
-      if (profileData.role === 'super_admin') {
-        // super_admin sees all companies
-        const { data, error } = await supabase
+      // 3a. Fetch company_users (no FK join — fetch companies separately)
+      const { data: cuData, error: cuError } = await supabase
+        .schema('registry')
+        .from('company_users')
+        .select('id, user_id, company_id, role, is_primary')
+        .eq('user_id', userId);
+
+      if (cuError) throw cuError;
+
+      // 3b. Fetch company rows for those company_ids
+      const companyIds = (cuData || []).map((cu) => cu.company_id);
+      let companyMap = {};
+      if (companyIds.length > 0) {
+        const { data: coData, error: coError } = await supabase
+          .schema('registry')
           .from('companies')
-          .select('id, name, short_name, gstin, address')
-          .eq('is_active', true)
-          .order('short_name');
-        if (error) throw error;
-        companyData = data || [];
-      } else {
-        // Other roles see only assigned companies
-        const { data, error } = await supabase
-          .from('user_companies')
-          .select('company_id, companies(id, name, short_name, gstin, address)')
-          .eq('user_id', userId);
-        if (error) throw error;
-        companyData = (data || [])
-          .map((uc) => uc.companies)
-          .filter(Boolean);
+          .select('id, code, name, short_name, gstin, is_active')
+          .in('id', companyIds);
+        if (coError) throw coError;
+        (coData || []).forEach((c) => { companyMap[c.id] = c; });
       }
 
-      setCompanies(companyData);
+      // 3c. Merge and filter to active companies only
+      const enriched   = (cuData || []).map((cu) => ({ ...cu, company: companyMap[cu.company_id] ?? null }));
+      const activeRows = enriched.filter((cu) => cu.company?.is_active);
 
-      // Restore last active company from localStorage, or default to first
-      const savedCompanyId = localStorage.getItem('relish_active_company');
-      const savedCompany = companyData.find((c) => c.id === savedCompanyId);
-      setActiveCompanyState(savedCompany || companyData[0] || null);
+      // 4. Restore active company: saved → primary → first
+      const savedId   = localStorage.getItem('relish_active_company');
+      const allCos    = activeRows.map((cu) => cu.company).filter(Boolean);
+      const savedCo   = allCos.find((c) => c.id === savedId);
+      const primaryCu = activeRows.find((cu) => cu.is_primary);
+      const resolvedCo = savedCo ?? primaryCu?.company ?? allCos[0] ?? null;
+
+      // Batch all derived state in one synchronous pass to avoid intermediate renders
+      setCompanyUsers(activeRows);
+      setActiveCompanyState(resolvedCo);
+
     } catch (err) {
-      console.error('Failed to fetch user data:', err);
+      console.error('AuthContext: fetchUserData failed', err);
       setProfile(null);
-      setCompanies([]);
+      setCompanyUsers([]);
       setActiveCompanyState(null);
     }
   }, []);
 
-  // ─── Set active company + persist to localStorage ──────
+  // ─── Set active company + persist ───────────────────────────────
   const setActiveCompany = useCallback((company) => {
     setActiveCompanyState(company);
     if (company?.id) {
@@ -77,126 +119,77 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // ─── Sign in with email + password ─────────────────────
+  // ─── Sign in ─────────────────────────────────────────────────────
   const signIn = useCallback(async (email, password) => {
     if (!supabase) throw new Error('Supabase not configured');
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     return data;
   }, []);
 
-  // ─── Sign out ──────────────────────────────────────────
+  // ─── Sign out ────────────────────────────────────────────────────
   const signOut = useCallback(async () => {
     localStorage.removeItem('relish_active_company');
-    if (!supabase) {
-      setSession(null); setUser(null); setProfile(null);
-      setCompanies([]); setActiveCompanyState(null);
-      return;
+    if (supabase) {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
     }
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
     setSession(null);
     setUser(null);
     setProfile(null);
-    setCompanies([]);
+    setCompanyUsers([]);
     setActiveCompanyState(null);
   }, []);
 
-  // ─── Role check helpers ────────────────────────────────
-  const hasRole = useCallback(
-    (roles) => {
-      if (!profile) return false;
-      const roleList = Array.isArray(roles) ? roles : [roles];
-      return roleList.includes(profile.role);
-    },
-    [profile]
-  );
-
-  const isSuperAdmin = useCallback(() => {
-    return profile?.role === 'super_admin';
-  }, [profile]);
-
-  const hasCompanyAccess = useCallback(
-    (companyId) => {
-      if (!profile) return false;
-      if (profile.role === 'super_admin') return true;
-      return companies.some((c) => c.id === companyId);
-    },
-    [profile, companies]
-  );
-
-  // ClamFlow is RHHF-only: visible to super_admin or users with rhhf access
-  const canAccessClamFlow = useCallback(() => {
-    if (!profile) return false;
-    if (profile.role === 'super_admin') return true;
-    return companies.some((c) => c.id === 'rhhf');
-  }, [profile, companies]);
-
-  // ─── Initialize auth session ───────────────────────────
+  // ─── Auth session listener ───────────────────────────────────────
   useEffect(() => {
     let mounted = true;
+    if (!supabase) { setLoading(false); return; }
 
-    // Get initial session
-    if (!supabase) {
-      setLoading(false);
-      return;
-    }
-
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+    supabase.auth.getSession().then(({ data: { session: init } }) => {
       if (!mounted) return;
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
-      if (initialSession?.user) {
-        fetchUserData(initialSession.user.id).finally(() => {
-          if (mounted) setLoading(false);
-        });
+      setSession(init);
+      setUser(init?.user ?? null);
+      if (init?.user) {
+        fetchUserData(init.user.id).finally(() => { if (mounted) setLoading(false); });
       } else {
         setLoading(false);
       }
     });
 
-    // Listen for auth changes (sign in, sign out, token refresh)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, next) => {
       if (!mounted) return;
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
-      if (newSession?.user) {
-        fetchUserData(newSession.user.id).finally(() => {
-          if (mounted) setLoading(false);
-        });
+      setSession(next);
+      setUser(next?.user ?? null);
+      if (next?.user) {
+        setLoading(true);
+        fetchUserData(next.user.id).finally(() => { if (mounted) setLoading(false); });
       } else {
         setProfile(null);
-        setCompanies([]);
+        setCompanyUsers([]);
         setActiveCompanyState(null);
         setLoading(false);
       }
     });
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, [fetchUserData]);
 
   const value = {
+    // Raw auth
     session,
     user,
-    profile,
-    companies,
+    // Registry data
+    profile,          // registry.profiles row — no role column
+    companyUsers,     // registry.company_users[] with company joined
+    companies,        // derived array of company objects — backward compat
     activeCompany,
+    activeRole,       // 'super_admin' | 'admin' | 'accounts' | ... | null
     setActiveCompany,
+    permissions,      // getPermissions(activeRole) result object
     loading,
     signIn,
     signOut,
-    hasRole,
-    isSuperAdmin,
-    hasCompanyAccess,
-    canAccessClamFlow,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

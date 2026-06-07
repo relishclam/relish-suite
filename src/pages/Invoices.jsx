@@ -40,7 +40,7 @@ const fmt = (v) =>
   });
 
 export default function Invoices() {
-  const { activeCompany, hasRole } = useAuth();
+  const { activeCompany, permissions } = useAuth();
   const navigate = useNavigate();
   const addToast = useToast();
 
@@ -52,7 +52,7 @@ export default function Invoices() {
   const [typeFilter, setTypeFilter] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const canEdit = hasRole(['super_admin', 'admin', 'operations']);
+  const canEdit = permissions.canCreateInvoice;
 
   const loadInvoices = useCallback(async () => {
     if (!activeCompany) return;
@@ -164,7 +164,7 @@ export default function Invoices() {
                 >
                   <td className="po-table__number">{inv.invoice_number}</td>
                   <td>{inv.invoice_date || '—'}</td>
-                  <td>{inv.buyers?.name || '—'}</td>
+                  <td>{inv.bill_to_company || '—'}</td>
                   <td>
                     <span className={`badge ${TYPE_COLORS[inv.invoice_type] || 'badge--muted'}`}>
                       {inv.invoice_type === 'commercial' ? 'Commercial' : 'Proforma'}

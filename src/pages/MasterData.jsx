@@ -24,7 +24,7 @@ const TABS = [
 ];
 
 export default function MasterData() {
-  const { activeCompany, isSuperAdmin, hasRole, canAccessClamFlow } = useAuth();
+  const { activeCompany, permissions, activeRole } = useAuth();
   const addToast = useToast();
 
   const [tab, setTab] = useState('companies');
@@ -55,12 +55,12 @@ export default function MasterData() {
   const [cfLots, setCfLots] = useState([]);
   const [cfSummary, setCfSummary] = useState(null);
 
-  const canEdit = hasRole(['super_admin', 'admin', 'operations']);
-  const canEditCompany = isSuperAdmin;
-  const canEditTally = hasRole(['super_admin', 'admin', 'accounts']);
+  const canEdit = permissions.canManageMasterData;
+  const canEditCompany = activeRole === 'super_admin';
+  const canEditTally = permissions.canExportTally;
 
   const visibleTabs = TABS.filter((t) => {
-    if (t.requiresClamFlow && !canAccessClamFlow) return false;
+    if (t.requiresClamFlow && !permissions.canViewClamFlow) return false;
     return true;
   });
 
@@ -73,8 +73,8 @@ export default function MasterData() {
     try {
       switch (tab) {
         case 'companies': setCompanies(await fetchCompanies()); break;
-        case 'vendors': setVendors(await fetchVendors(activeCompany.id, { search, activeOnly: !showInactive })); break;
-        case 'buyers': setBuyers(await fetchBuyers(activeCompany.id, { search, activeOnly: !showInactive })); break;
+        case 'vendors': setVendors(await fetchVendors(activeCompany.id)); break;
+        case 'buyers': setBuyers(await fetchBuyers(activeCompany.id)); break;
         case 'products': setProducts(await fetchProducts(activeCompany.id, { search, activeOnly: !showInactive })); break;
         case 'delivery': setAddresses(await fetchDeliveryAddresses(activeCompany.id)); break;
         case 'tally': setTallyConf(await fetchTallyConfig(activeCompany.id)); break;
@@ -101,7 +101,13 @@ export default function MasterData() {
 
   const openEdit = (title, record) => {
     setEditing(record);
-    setForm({ ...record });
+    if (tab === 'vendors') {
+      setForm({ ...record.entity, vendor_code: record.entity?.alias });
+    } else if (tab === 'buyers') {
+      setForm({ ...record.entity });
+    } else {
+      setForm({ ...record });
+    }
     setSlideTitle(title);
     setSlideOpen(true);
   };
@@ -269,8 +275,7 @@ export default function MasterData() {
                 { key: 'short_name', label: 'Code' },
                 { key: 'name', label: 'Company Name' },
                 { key: 'gstin', label: 'GSTIN' },
-                { key: 'contact_name', label: 'Contact' },
-                { key: 'contact_phone', label: 'Phone' },
+                { key: 'phone', label: 'Phone' },
               ],
               companies,
               canEditCompany ? (r) => openEdit('Edit Company', r) : undefined
@@ -285,11 +290,10 @@ export default function MasterData() {
             {renderFilterBar('Search vendors…', '+ Add Vendor', () => openNew('New Vendor', { is_active: true }))}
             {loading ? <LoadingSpinner /> : renderTable(
               [
-                { key: 'name', label: 'Vendor Name' },
-                { key: 'contact_person', label: 'Contact' },
-                { key: 'phone', label: 'Phone' },
-                { key: 'city', label: 'City' },
-                { key: 'gstin', label: 'GSTIN' },
+                { key: 'display_name', label: 'Vendor Name', render: (r) => r.entity?.display_name || '—' },
+                { key: 'mobile', label: 'Phone', render: (r) => r.entity?.mobile || '—' },
+                { key: 'city', label: 'City', render: (r) => r.entity?.city || '—' },
+                { key: 'gstin', label: 'GSTIN', render: (r) => r.entity?.gstin || '—' },
                 { key: 'is_active', label: 'Status', render: (r) => <span className={`badge badge--${r.is_active ? 'success' : 'muted'}`}>{r.is_active ? 'Active' : 'Inactive'}</span> },
               ],
               vendors,
@@ -305,11 +309,10 @@ export default function MasterData() {
             {renderFilterBar('Search buyers…', '+ Add Buyer', () => openNew('New Buyer', { is_active: true }))}
             {loading ? <LoadingSpinner /> : renderTable(
               [
-                { key: 'name', label: 'Buyer Name' },
-                { key: 'contact_person', label: 'Contact' },
-                { key: 'phone', label: 'Phone' },
-                { key: 'city', label: 'City' },
-                { key: 'country', label: 'Country' },
+                { key: 'display_name', label: 'Buyer Name', render: (r) => r.entity?.display_name || '—' },
+                { key: 'alias', label: 'Alias / Short Name', render: (r) => r.entity?.alias || '—' },
+                { key: 'city', label: 'City', render: (r) => r.entity?.city || '—' },
+                { key: 'country', label: 'Country', render: (r) => r.entity?.country || '—' },
                 { key: 'is_active', label: 'Status', render: (r) => <span className={`badge badge--${r.is_active ? 'success' : 'muted'}`}>{r.is_active ? 'Active' : 'Inactive'}</span> },
               ],
               buyers,
@@ -459,9 +462,8 @@ export default function MasterData() {
               {inp('Company Name', 'name')}
               {inp('Short Name', 'short_name')}
               {inp('GSTIN', 'gstin')}
-              {inp('Address', 'address', { span2: true, textarea: true })}
-              {inp('Contact Name', 'contact_name')}
-              {inp('Contact Phone', 'contact_phone')}
+              {inp('Address', 'address_line1', { span2: true, textarea: true })}
+              {inp('Phone', 'phone')}
             </div>
             {canEditCompany && (
               <div className="md-slide-form__actions">
@@ -477,7 +479,7 @@ export default function MasterData() {
           <div className="md-slide-form">
             <div className="po-form__grid">
               {inp('Vendor Name *', 'name')}
-              {inp('Contact Person', 'contact_person')}
+              {inp('Vendor Code / Alias', 'vendor_code')}
               {inp('Phone', 'phone')}
               {inp('Email', 'email', { type: 'email' })}
               {inp('Address Line 1', 'address_line1', { span2: true })}
@@ -490,11 +492,26 @@ export default function MasterData() {
               {inp('Active', 'is_active', { toggle: true })}
             </div>
             <div className="md-slide-form__actions">
-              <button type="button" className="btn btn-primary" disabled={saving} onClick={() => handleSave(createVendor, updateVendor, 'vendors')}>{saving ? 'Saving…' : editing ? 'Update' : 'Create'}</button>
+              <button type="button" className="btn btn-primary" disabled={saving} onClick={async () => {
+                setSaving(true);
+                try {
+                  if (editing) {
+                    await updateVendor(editing.entity.id, form);
+                    writeAuditLog({ companyId: activeCompany?.id, action: 'update', tableName: 'registry.entities', recordId: editing.entity.id });
+                  } else {
+                    const result = await createVendor(activeCompany.id, form);
+                    writeAuditLog({ companyId: activeCompany?.id, action: 'create', tableName: 'registry.entities', recordId: result.entity.id });
+                  }
+                  addToast(editing ? 'Updated successfully' : 'Created successfully', 'success');
+                  closeSlide();
+                  loadTab();
+                } catch (err) { addToast('Save failed: ' + err.message, 'error'); }
+                finally { setSaving(false); }
+              }}>{saving ? 'Saving…' : editing ? 'Update' : 'Create'}</button>
               <button type="button" className="btn" onClick={closeSlide}>Cancel</button>
               {editing && (
-                <button type="button" className={`btn btn-sm ${editing.is_active ? 'btn-danger-outline' : ''}`} style={{ marginLeft: 'auto' }} onClick={() => { handleToggle(toggleVendorActive, editing.id, !editing.is_active, 'vendors'); closeSlide(); }}>
-                  {editing.is_active ? 'Deactivate' : 'Activate'}
+                <button type="button" className={`btn btn-sm ${editing.entity?.is_active ? 'btn-danger-outline' : ''}`} style={{ marginLeft: 'auto' }} onClick={() => { handleToggle(toggleVendorActive, editing.id, !editing.entity?.is_active, 'vendors'); closeSlide(); }}>
+                  {editing.entity?.is_active ? 'Deactivate' : 'Activate'}
                 </button>
               )}
             </div>
@@ -506,7 +523,7 @@ export default function MasterData() {
           <div className="md-slide-form">
             <div className="po-form__grid">
               {inp('Buyer Name *', 'name')}
-              {inp('Contact Person', 'contact_person')}
+              {inp('Alias / Short Name', 'alias')}
               {inp('Phone', 'phone')}
               {inp('Email', 'email', { type: 'email' })}
               {inp('Address Line 1', 'address_line1', { span2: true })}
@@ -519,11 +536,26 @@ export default function MasterData() {
               {inp('Active', 'is_active', { toggle: true })}
             </div>
             <div className="md-slide-form__actions">
-              <button type="button" className="btn btn-primary" disabled={saving} onClick={() => handleSave(createBuyer, updateBuyer, 'buyers')}>{saving ? 'Saving…' : editing ? 'Update' : 'Create'}</button>
+              <button type="button" className="btn btn-primary" disabled={saving} onClick={async () => {
+                setSaving(true);
+                try {
+                  if (editing) {
+                    await updateBuyer(editing.entity.id, form);
+                    writeAuditLog({ companyId: activeCompany?.id, action: 'update', tableName: 'registry.entities', recordId: editing.entity.id });
+                  } else {
+                    const result = await createBuyer(activeCompany.id, form);
+                    writeAuditLog({ companyId: activeCompany?.id, action: 'create', tableName: 'registry.entities', recordId: result.entity.id });
+                  }
+                  addToast(editing ? 'Updated successfully' : 'Created successfully', 'success');
+                  closeSlide();
+                  loadTab();
+                } catch (err) { addToast('Save failed: ' + err.message, 'error'); }
+                finally { setSaving(false); }
+              }}>{saving ? 'Saving…' : editing ? 'Update' : 'Create'}</button>
               <button type="button" className="btn" onClick={closeSlide}>Cancel</button>
               {editing && (
-                <button type="button" className={`btn btn-sm ${editing.is_active ? 'btn-danger-outline' : ''}`} style={{ marginLeft: 'auto' }} onClick={() => { handleToggle(toggleBuyerActive, editing.id, !editing.is_active, 'buyers'); closeSlide(); }}>
-                  {editing.is_active ? 'Deactivate' : 'Activate'}
+                <button type="button" className={`btn btn-sm ${editing.entity?.is_active ? 'btn-danger-outline' : ''}`} style={{ marginLeft: 'auto' }} onClick={() => { handleToggle(toggleBuyerActive, editing.id, !editing.entity?.is_active, 'buyers'); closeSlide(); }}>
+                  {editing.entity?.is_active ? 'Deactivate' : 'Activate'}
                 </button>
               )}
             </div>

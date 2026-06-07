@@ -11,7 +11,7 @@ import LoadingSpinner from './LoadingSpinner';
  *   requireCompany  — if true, user must have at least one company assigned (default true)
  */
 export default function ProtectedRoute({ children, roles, requireCompany = true }) {
-  const { user, profile, companies, loading } = useAuth();
+  const { user, profile, activeRole, companies, loading } = useAuth();
 
   if (loading) return <LoadingSpinner />;
 
@@ -22,7 +22,7 @@ export default function ProtectedRoute({ children, roles, requireCompany = true 
   if (!profile || !profile.is_active) return <Navigate to="/login" replace />;
 
   // Role gate
-  if (roles && roles.length > 0 && !roles.includes(profile.role)) {
+  if (roles && roles.length > 0 && !roles.includes(activeRole)) {
     return <Navigate to="/dashboard" replace />;
   }
 

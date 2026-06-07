@@ -3,7 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import useOnlineStatus from '../../hooks/useOnlineStatus';
 
 export default function Header({ onMenuToggle }) {
-  const { profile, companies, activeCompany, setActiveCompany, signOut } = useAuth();
+  const { profile, activeRole, companies, activeCompany, setActiveCompany, signOut } = useAuth();
   const isOnline = useOnlineStatus();
   const navigate = useNavigate();
   const location = useLocation();
@@ -65,7 +65,7 @@ export default function Header({ onMenuToggle }) {
             {profile?.full_name || profile?.email || '—'}
           </span>
           <span className="app-header__user-role badge">
-            {profile?.role?.replace('_', ' ')}
+            {activeRole?.replace('_', ' ')}
           </span>
           <button className="btn btn-ghost app-header__signout" onClick={signOut}>
             Sign Out

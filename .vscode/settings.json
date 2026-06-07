@@ -1,0 +1,10 @@
+{
+    "github.copilot.chat.agent.autoFix": true,
+    "github.copilot.chat.claudeAgent.allowDangerouslySkipPermissions": false,
+    "chat.agent.allowedNetworkDomains": [
+        "github.com",
+        "api.github.com",
+        "copilot.github.com"
+    ],
+    "commentTranslate.hover.enabled": true
+}

@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 // ─── List delivery addresses for a company ───────────────
 export async function fetchDeliveryAddresses(companyId) {
   const { data, error } = await supabase
+    .schema('suite')
     .from('delivery_addresses')
     .select('*')
     .eq('company_id', companyId)
@@ -15,6 +16,7 @@ export async function fetchDeliveryAddresses(companyId) {
 // ─── Get single delivery address ─────────────────────────
 export async function fetchDeliveryAddress(addressId) {
   const { data, error } = await supabase
+    .schema('suite')
     .from('delivery_addresses')
     .select('*')
     .eq('id', addressId)
@@ -26,6 +28,7 @@ export async function fetchDeliveryAddress(addressId) {
 // ─── Create delivery address ─────────────────────────────
 export async function createDeliveryAddress(address) {
   const { data, error } = await supabase
+    .schema('suite')
     .from('delivery_addresses')
     .insert(address)
     .select()
@@ -37,6 +40,7 @@ export async function createDeliveryAddress(address) {
 // ─── Update delivery address ─────────────────────────────
 export async function updateDeliveryAddress(addressId, updates) {
   const { data, error } = await supabase
+    .schema('suite')
     .from('delivery_addresses')
     .update(updates)
     .eq('id', addressId)

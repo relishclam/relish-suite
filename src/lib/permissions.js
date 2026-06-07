@@ -1,0 +1,121 @@
+// ── Permission map per role ──────────────────────────────────────
+// 'super_admin' is a synthetic role value set when
+// profile.is_super_admin = true. It does NOT appear in
+// company_users.role — that CHECK constraint starts at 'admin'.
+// getPermissions() accepts it as a valid input and returns all-true.
+
+const ROLE_PERMISSIONS = {
+  super_admin: {
+    canViewDashboard:    true,
+    canCreatePO:         true,
+    canApprovePO:        true,
+    canCreateInvoice:    true,
+    canViewReports:      true,
+    canPostVouchers:     true,
+    canApprovePayments:  true,
+    canManageUsers:      true,
+    canManageMasterData: true,
+    canExportTally:      true,
+    canViewClamFlow:     true,
+    canManageOnboarding: true,
+    canManageHR:         true,
+  },
+  admin: {
+    canViewDashboard:    true,
+    canCreatePO:         true,
+    canApprovePO:        true,
+    canCreateInvoice:    true,
+    canViewReports:      true,
+    canPostVouchers:     true,
+    canApprovePayments:  true,
+    canManageUsers:      true,
+    canManageMasterData: true,
+    canExportTally:      true,
+    canViewClamFlow:     true,
+    canManageOnboarding: true,
+    canManageHR:         true,
+  },
+  accounts: {
+    canViewDashboard:    true,
+    canCreatePO:         true,
+    canApprovePO:        false,
+    canCreateInvoice:    true,
+    canViewReports:      true,
+    canPostVouchers:     false,
+    canApprovePayments:  false,
+    canManageUsers:      false,
+    canManageMasterData: false,
+    canExportTally:      true,
+    canViewClamFlow:     false,
+    canManageOnboarding: false,
+    canManageHR:         false,
+  },
+  auditor: {
+    canViewDashboard:    true,
+    canCreatePO:         false,
+    canApprovePO:        false,
+    canCreateInvoice:    false,
+    canViewReports:      true,
+    canPostVouchers:     false,
+    canApprovePayments:  false,
+    canManageUsers:      false,
+    canManageMasterData: false,
+    canExportTally:      true,
+    canViewClamFlow:     false,
+    canManageOnboarding: false,
+    canManageHR:         false,
+  },
+  hr: {
+    canViewDashboard:    true,
+    canCreatePO:         false,
+    canApprovePO:        false,
+    canCreateInvoice:    false,
+    canViewReports:      false,
+    canPostVouchers:     false,
+    canApprovePayments:  false,
+    canManageUsers:      false,
+    canManageMasterData: false,
+    canExportTally:      false,
+    canViewClamFlow:     false,
+    canManageOnboarding: true,
+    canManageHR:         true,
+  },
+  operations: {
+    canViewDashboard:    true,
+    canCreatePO:         false,
+    canApprovePO:        false,
+    canCreateInvoice:    false,
+    canViewReports:      false,
+    canPostVouchers:     false,
+    canApprovePayments:  false,
+    canManageUsers:      false,
+    canManageMasterData: false,
+    canExportTally:      false,
+    canViewClamFlow:     true,
+    canManageOnboarding: false,
+    canManageHR:         false,
+  },
+  viewer: {
+    canViewDashboard:    true,
+    canCreatePO:         false,
+    canApprovePO:        false,
+    canCreateInvoice:    false,
+    canViewReports:      false,
+    canPostVouchers:     false,
+    canApprovePayments:  false,
+    canManageUsers:      false,
+    canManageMasterData: false,
+    canExportTally:      false,
+    canViewClamFlow:     false,
+    canManageOnboarding: false,
+    canManageHR:         false,
+  },
+};
+
+const NO_PERMISSIONS = Object.fromEntries(
+  Object.keys(ROLE_PERMISSIONS.viewer).map((k) => [k, false])
+);
+
+export function getPermissions(role) {
+  return ROLE_PERMISSIONS[role] ?? NO_PERMISSIONS;
+}

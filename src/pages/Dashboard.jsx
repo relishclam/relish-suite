@@ -50,7 +50,7 @@ const EXTERNAL_APPS = [
 ];
 
 export default function Dashboard() {
-  const { profile, activeCompany, canAccessClamFlow } = useAuth();
+  const { profile, activeCompany, activeRole, permissions } = useAuth();
   const navigate = useNavigate();
   // null = all collapsed; click same tab to collapse, different tab to switch
   const [openTab, setOpenTab] = useState(null);
@@ -58,14 +58,14 @@ export default function Dashboard() {
   const filterLinks = (links) =>
     links.filter((l) => {
       if (!l.roles) return true;
-      return l.roles.includes(profile?.role);
+      return l.roles.includes(activeRole);
     });
 
   const visibleTabs = TABS.filter((tab) => filterLinks(tab.links).length > 0);
 
   const visibleExternal = EXTERNAL_APPS.filter((app) => {
-    if (app.requiresClamFlow) return canAccessClamFlow();
-    if (app.roles) return app.roles.includes(profile?.role);
+    if (app.requiresClamFlow) return permissions.canViewClamFlow;
+    if (app.roles) return app.roles.includes(activeRole);
     return true;
   });
 

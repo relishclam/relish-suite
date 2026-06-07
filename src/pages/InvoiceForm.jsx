@@ -56,9 +56,9 @@ export default function InvoiceForm() {
   const { id: invId } = useParams();
   const isEdit = Boolean(invId) && invId !== 'new';
   const navigate = useNavigate();
-  const { activeCompany, hasRole } = useAuth();
+  const { activeCompany, permissions } = useAuth();
   const addToast = useToast();
-  const canEdit = hasRole(['super_admin', 'admin', 'operations']);
+  const canEdit = permissions.canCreateInvoice;
 
   const [step, setStep] = useState(0);
   const [pageLoading, setPageLoading] = useState(isEdit);
@@ -187,58 +187,56 @@ export default function InvoiceForm() {
     (async () => {
       try {
         const inv = await fetchInvoice(invId);
-        setDocType(inv.invoice_type || 'proforma');
+        setDocType(inv.doc_type || 'proforma');
         setInvDate(inv.invoice_date || today());
         setInvExpiry(inv.expiry_date || '');
         setCurrency(inv.currency || 'USD');
-        setCustRef(inv.customer_reference || '');
-        setReasonExport(inv.reason_for_export || '');
+        setCustRef(inv.customer_ref || '');
+        setReasonExport(inv.reason_export || '');
         setLcNumber(inv.lc_number || '');
         setLcDate(inv.lc_date || '');
 
-        setBuyerId(inv.buyer_id || '');
-        if (inv.buyers) {
-          setBillCo(inv.buyers.name || '');
-          setBillA1(inv.buyers.address_line1 || '');
-          setBillA2(inv.buyers.address_line2 || '');
-          setBillCity(inv.buyers.city || '');
-          setBillState(inv.buyers.state || '');
-          setBillZip(inv.buyers.postal_code || '');
-          setBillCountry(inv.buyers.country || '');
-          setBillContact(inv.buyers.contact_person || '');
-          setBillPhone(inv.buyers.phone || '');
-          setBillEmail(inv.buyers.email || '');
-          setBillGstin(inv.buyers.gstin || '');
-        }
+        setBuyerId(inv.buyer_entity_id || '');
+        setBillCo(inv.bill_to_company || '');
+        setBillA1(inv.bill_to_address || '');
+        setBillA2('');
+        setBillCity('');
+        setBillState('');
+        setBillZip('');
+        setBillCountry('');
+        setBillContact(inv.bill_to_contact || '');
+        setBillPhone(inv.bill_to_phone || '');
+        setBillEmail(inv.bill_to_email || '');
+        setBillGstin(inv.bill_to_gstin || '');
 
-        setShipCo(inv.ship_to_name || '');
-        setShipA1(inv.ship_to_address_line1 || '');
-        setShipA2(inv.ship_to_address_line2 || '');
-        setShipCity(inv.ship_to_city || '');
-        setShipState(inv.ship_to_state || '');
-        setShipZip(inv.ship_to_postal_code || '');
-        setShipCountry(inv.ship_to_country || '');
+        setShipCo(inv.ship_to_company || '');
+        setShipA1(inv.ship_to_address || '');
+        setShipA2('');
+        setShipCity('');
+        setShipState('');
+        setShipZip('');
+        setShipCountry('');
         setNotifyParty(inv.notify_party || '');
 
         setFreightType(inv.freight_type || FREIGHT_TYPES[0]);
         setIncoterm(inv.incoterm || INCOTERMS[0]);
         setPol(inv.port_of_loading || '');
         setPod(inv.port_of_discharge || '');
-        setShipDate(inv.shipment_date || '');
+        setShipDate(inv.ship_date || '');
         setDelDate(inv.delivery_date || '');
         setVessel(inv.vessel || '');
-        setBlNo(inv.bl_awb_number || '');
+        setBlNo(inv.bl_number || '');
         setGrossWt(inv.gross_weight || '');
         setNetWt(inv.net_weight || '');
-        setCube(inv.volume_cbm || '');
+        setCube(inv.cubic_volume || '');
         setTotalPkgs(inv.total_packages || '');
-        setMarks(inv.marks_numbers || '');
+        setMarks(inv.marks || '');
         setCountryOrigin(inv.country_of_origin || '');
         setFinalDest(inv.final_destination || '');
 
         setPayTerms(inv.payment_terms || PAYMENT_TERMS[0]);
         setTaxRate(String(inv.tax_rate ?? '0'));
-        setExtraCharges(String(inv.extra_charges ?? '0'));
+        setExtraCharges(String(inv.freight_other ?? '0'));
         setBankDetails(inv.bank_details || '');
         setTermsText(inv.terms_conditions || '');
 
@@ -277,19 +275,20 @@ export default function InvoiceForm() {
   }, [isEdit, invId, addToast, navigate]);
 
   // Fill buyer from picker
-  const fillBuyer = useCallback((bId) => {
-    setBuyerId(bId);
-    const b = buyers.find((x) => x.id === bId);
-    if (!b) return;
-    setBillCo(b.name || '');
+  const fillBuyer = useCallback((entityId) => {
+    setBuyerId(entityId);
+    const br = buyers.find((x) => x.entity?.id === entityId);
+    if (!br) return;
+    const b = br.entity;
+    setBillCo(b.display_name || '');
     setBillA1(b.address_line1 || '');
     setBillA2(b.address_line2 || '');
     setBillCity(b.city || '');
     setBillState(b.state || '');
-    setBillZip(b.postal_code || '');
+    setBillZip(b.pincode || '');
     setBillCountry(b.country || '');
-    setBillContact(b.contact_person || '');
-    setBillPhone(b.phone || '');
+    setBillContact(b.alias || '');
+    setBillPhone(b.mobile || '');
     setBillEmail(b.email || '');
     setBillGstin(b.gstin || '');
   }, [buyers]);
@@ -326,53 +325,43 @@ export default function InvoiceForm() {
     try {
       const invData = {
         company_id: activeCompany.id,
-        invoice_type: docType,
+        doc_type: docType,
         status: 'draft',
         invoice_date: invDate || null,
         expiry_date: invExpiry || null,
         currency,
-        customer_reference: custRef || null,
-        reason_for_export: reasonExport || null,
+        customer_ref: custRef || null,
+        reason_export: reasonExport || null,
         lc_number: lcNumber || null,
         lc_date: lcDate || null,
-        buyer_id: buyerId || null,
-        buyer_name: billCo,
-        buyer_address_line1: billA1 || null,
-        buyer_address_line2: billA2 || null,
-        buyer_city: billCity || null,
-        buyer_state: billState || null,
-        buyer_postal_code: billZip || null,
-        buyer_country: billCountry || null,
-        buyer_contact: billContact || null,
-        buyer_phone: billPhone || null,
-        buyer_email: billEmail || null,
-        buyer_gstin: billGstin || null,
-        ship_to_name: shipCo || null,
-        ship_to_address_line1: shipA1 || null,
-        ship_to_address_line2: shipA2 || null,
-        ship_to_city: shipCity || null,
-        ship_to_state: shipState || null,
-        ship_to_postal_code: shipZip || null,
-        ship_to_country: shipCountry || null,
+        buyer_entity_id: buyerId || null,
+        bill_to_company: billCo,
+        bill_to_address: [billA1, billA2, [billCity, billState, billZip].filter(Boolean).join(', '), billCountry].filter(Boolean).join('\n') || null,
+        bill_to_contact: billContact || null,
+        bill_to_phone: billPhone || null,
+        bill_to_email: billEmail || null,
+        bill_to_gstin: billGstin || null,
+        ship_to_company: shipCo || null,
+        ship_to_address: [shipA1, shipA2, [shipCity, shipState, shipZip].filter(Boolean).join(', '), shipCountry].filter(Boolean).join('\n') || null,
         notify_party: notifyParty || null,
         freight_type: freightType || null,
         incoterm: incoterm || null,
         port_of_loading: pol || null,
         port_of_discharge: pod || null,
-        shipment_date: shipDate || null,
+        ship_date: shipDate || null,
         delivery_date: delDate || null,
         vessel: vessel || null,
-        bl_awb_number: blNo || null,
+        bl_number: blNo || null,
         gross_weight: grossWt || null,
         net_weight: netWt || null,
-        volume_cbm: cube || null,
+        cubic_volume: cube || null,
         total_packages: totalPkgs || null,
-        marks_numbers: marks || null,
+        marks: marks || null,
         country_of_origin: countryOrigin || null,
         final_destination: finalDest || null,
         payment_terms: payTerms || null,
         tax_rate: parseFloat(taxRate) || 0,
-        extra_charges: parseFloat(extraCharges) || 0,
+        freight_other: parseFloat(extraCharges) || 0,
         bank_details: bankDetails || null,
         terms_conditions: termsText || null,
         hs_code: hsCode || null,
@@ -410,7 +399,7 @@ export default function InvoiceForm() {
         writeAuditLog({ companyId: activeCompany.id, action: 'update', tableName: 'invoices', recordId: invId });
         addToast('Invoice updated', 'success');
       } else {
-        const newInv = await createInvoice(invData, lineItemsData, packLinesData);
+        const newInv = await createInvoice(invData, lineItemsData, packLinesData, activeCompany);
         writeAuditLog({ companyId: activeCompany.id, action: 'create', tableName: 'invoices', recordId: newInv.id });
         addToast('Invoice created: ' + newInv.invoice_number, 'success');
       }
@@ -517,7 +506,7 @@ export default function InvoiceForm() {
             <div className="po-form__vendor-picker">
               <select className="form-input" value={buyerId} onChange={(e) => fillBuyer(e.target.value)}>
                 <option value="">— Select saved buyer —</option>
-                {buyers.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
+                {buyers.map((br) => (<option key={br.entity?.id} value={br.entity?.id}>{br.entity?.display_name}</option>))}
               </select>
             </div>
             <div className="po-form__grid">

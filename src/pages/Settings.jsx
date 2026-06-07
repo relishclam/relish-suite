@@ -4,7 +4,7 @@ import { useToast } from '../components/common/Toast';
 import { updateProfile } from '../lib/profiles';
 
 export default function Settings() {
-  const { profile, user, companies, activeCompany, signOut } = useAuth();
+  const { profile, user, companies, activeCompany, activeRole, signOut } = useAuth();
   const addToast = useToast();
   const [name, setName] = useState(profile?.full_name || '');
   const [saving, setSaving] = useState(false);
@@ -34,7 +34,7 @@ export default function Settings() {
           </div>
           <div className="form-group">
             <label className="form-label">Role</label>
-            <input className="form-input" value={profile?.role || ''} readOnly />
+            <input className="form-input" value={activeRole || ''} readOnly />
           </div>
           <div className="form-group form-group--span2">
             <label className="form-label">Full Name</label>

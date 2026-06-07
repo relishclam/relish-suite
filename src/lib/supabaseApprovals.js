@@ -1,7 +1,10 @@
-// Approvals DB — READ ONLY — .select() ONLY, ZERO writes, ZERO schema changes
-// Owns: Payment vouchers (managed by relishapprovals app)
-// Suite reads: approved vouchers for Tally export
-// NEVER insert, update, delete, or alter any table in this database
+// ═══════════════════════════════════════════════════════════════
+// RELISH APPROVALS — READ-ONLY CONNECTION
+// Project: ewbguvwrejdvlhzcqlbp (relishvoucher.vercel.app)
+// This is a LIVE PRODUCTION system.
+// NEVER call .insert() .update() .delete() .upsert() on this client.
+// This file exists only to READ approved vouchers for Tally XML export.
+// ═══════════════════════════════════════════════════════════════
 import { createClient } from '@supabase/supabase-js';
 
 const approvalsUrl = import.meta.env.VITE_APPROVALS_SUPABASE_URL;
@@ -11,7 +14,7 @@ if (!approvalsUrl || !approvalsAnonKey) {
   console.warn('Approvals Supabase credentials missing — Tally export will be unavailable');
 }
 
-export const supabaseApprovals = approvalsUrl && approvalsAnonKey
+export const supabaseApprovalsReadOnly = approvalsUrl && approvalsAnonKey
   ? createClient(approvalsUrl, approvalsAnonKey, {
       auth: {
         autoRefreshToken: false,

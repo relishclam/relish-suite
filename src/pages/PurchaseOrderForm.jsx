@@ -98,10 +98,10 @@ export default function PurchaseOrderForm() {
   const { id: poId } = useParams();
   const isEdit = Boolean(poId) && poId !== 'new';
   const navigate = useNavigate();
-  const { activeCompany, hasRole } = useAuth();
+  const { activeCompany, permissions } = useAuth();
   const addToast = useToast();
 
-  const canEdit = hasRole(['super_admin', 'admin', 'operations']);
+  const canEdit = permissions.canCreatePO;
 
   // Wizard step
   const [step, setStep] = useState(0);
@@ -209,21 +209,21 @@ export default function PurchaseOrderForm() {
         setPoNotes(po.notes || '');
 
         // Vendor
-        setVendorId(po.vendor_id || '');
-        if (po.vendors) {
-          setVendorName(po.vendors.name || '');
-          setVendorA1(po.vendors.address_line1 || '');
-          setVendorA2(po.vendors.address_line2 || '');
-          setVendorCity(po.vendors.city || '');
-          setVendorState(po.vendors.state || '');
-          setVendorZip(po.vendors.postal_code || '');
-          setVendorCountry(po.vendors.country || '');
-          setVendorContact(po.vendors.contact_person || '');
-          setVendorPhone(po.vendors.phone || '');
-          setVendorEmail(po.vendors.email || '');
-          setVendorGstin(po.vendors.gstin || '');
-          setVendorCode(po.vendors.vendor_code || '');
-          setVendorBank(po.vendors.bank_details || '');
+        setVendorId(po.vendor_entity_id || '');
+        if (po.vendor_entity) {
+          setVendorName(po.vendor_entity.display_name || '');
+          setVendorA1(po.vendor_entity.address_line1 || '');
+          setVendorA2(po.vendor_entity.address_line2 || '');
+          setVendorCity(po.vendor_entity.city || '');
+          setVendorState(po.vendor_entity.state || '');
+          setVendorZip(po.vendor_entity.pincode || '');
+          setVendorCountry(po.vendor_entity.country || '');
+          setVendorContact(po.vendor_entity.alias || '');
+          setVendorPhone(po.vendor_entity.mobile || '');
+          setVendorEmail(po.vendor_entity.email || '');
+          setVendorGstin(po.vendor_entity.gstin || '');
+          setVendorCode(po.vendor_entity.alias || '');
+          setVendorBank(po.vendor_entity.bank_name || '');
         }
 
         // Delivery
@@ -269,23 +269,24 @@ export default function PurchaseOrderForm() {
 
   // ─── Fill vendor from picker ───
   const fillVendor = useCallback(
-    (vId) => {
-      setVendorId(vId);
-      const v = vendors.find((x) => x.id === vId);
-      if (!v) return;
-      setVendorName(v.name || '');
+    (entityId) => {
+      setVendorId(entityId);
+      const vr = vendors.find((x) => x.entity?.id === entityId);
+      if (!vr) return;
+      const v = vr.entity;
+      setVendorName(v.display_name || '');
       setVendorA1(v.address_line1 || '');
       setVendorA2(v.address_line2 || '');
       setVendorCity(v.city || '');
       setVendorState(v.state || '');
-      setVendorZip(v.postal_code || '');
+      setVendorZip(v.pincode || '');
       setVendorCountry(v.country || '');
-      setVendorContact(v.contact_person || '');
-      setVendorPhone(v.phone || '');
+      setVendorContact(v.alias || '');
+      setVendorPhone(v.mobile || '');
       setVendorEmail(v.email || '');
       setVendorGstin(v.gstin || '');
-      setVendorCode(v.vendor_code || '');
-      setVendorBank(v.bank_details || '');
+      setVendorCode(v.alias || '');
+      setVendorBank(v.bank_name || '');
     },
     [vendors]
   );
@@ -363,7 +364,7 @@ export default function PurchaseOrderForm() {
         priority,
         department: department || null,
         notes: poNotes || null,
-        vendor_id: vendorId || null,
+        vendor_entity_id: vendorId || null,
         vendor_name: vendorName,
         vendor_address_line1: vendorA1 || null,
         vendor_address_line2: vendorA2 || null,
@@ -420,7 +421,7 @@ export default function PurchaseOrderForm() {
         });
         addToast('Purchase order updated', 'success');
       } else {
-        const newPo = await createPurchaseOrder(poData, lineItemsData);
+        const newPo = await createPurchaseOrder(poData, lineItemsData, activeCompany);
         writeAuditLog({
           companyId: activeCompany.id,
           action: 'create',
@@ -548,8 +549,8 @@ export default function PurchaseOrderForm() {
           <div className="po-form__vendor-picker">
             <select className="form-input" value={vendorId} onChange={(e) => fillVendor(e.target.value)}>
               <option value="">— Select saved vendor —</option>
-              {vendors.map((v) => (
-                <option key={v.id} value={v.id}>{v.name}</option>
+              {vendors.map((vr) => (
+                <option key={vr.entity?.id} value={vr.entity?.id}>{vr.entity?.display_name}</option>
               ))}
             </select>
           </div>

@@ -1,56 +1,125 @@
 import { supabase } from './supabase';
 
-// ─── List buyers for a company ───────────────────────────
-export async function fetchBuyers(companyId, { search = '', activeOnly = true } = {}) {
-  let query = supabase
-    .from('buyers')
-    .select('*')
+// ─── Fetch all buyers for a company ──────────────────────────────
+// Returns entity_roles[] each with a nested entity object.
+// Callers use: vr.entity.id, vr.entity.display_name, etc.
+export async function fetchBuyers(companyId) {
+  const { data, error } = await supabase
+    .schema('registry')
+    .from('entity_roles')
+    .select(`
+      id,
+      role,
+      tally_ledger,
+      entity:entities(
+        id, display_name, alias, gstin, pan,
+        mobile, email,
+        address_line1, address_line2, city, state, pincode, country,
+        is_active, source_app
+      )
+    `)
     .eq('company_id', companyId)
-    .order('name');
-
-  if (activeOnly) query = query.eq('is_active', true);
-  if (search) query = query.ilike('name', `%${search}%`);
-
-  const { data, error } = await query;
+    .eq('role', 'Customer')
+    .eq('is_active', true);
   if (error) throw error;
-  return data;
+  return (data || []).sort((a, b) =>
+    (a.entity?.display_name || '').localeCompare(b.entity?.display_name || '')
+  );
 }
 
-// ─── Get single buyer ────────────────────────────────────
-export async function fetchBuyer(buyerId) {
+// ─── Fetch single buyer entity by entity_id ──────────────────────
+export async function fetchBuyer(entityId) {
   const { data, error } = await supabase
-    .from('buyers')
+    .schema('registry')
+    .from('entities')
     .select('*')
-    .eq('id', buyerId)
+    .eq('id', entityId)
     .single();
   if (error) throw error;
   return data;
 }
 
-// ─── Create buyer ────────────────────────────────────────
-export async function createBuyer(buyer) {
+// ─── Create buyer: insert entity then entity_role ─────────────────
+export async function createBuyer(companyId, buyerData) {
+  const { data: entity, error: entityError } = await supabase
+    .schema('registry')
+    .from('entities')
+    .insert({
+      type: 'ORGANISATION',
+      display_name: buyerData.name,
+      alias: buyerData.alias ?? null,
+      gstin: buyerData.gstin ?? null,
+      mobile: buyerData.phone ?? null,
+      email: buyerData.email ?? null,
+      address_line1: buyerData.address_line1 ?? null,
+      address_line2: buyerData.address_line2 ?? null,
+      city: buyerData.city ?? null,
+      state: buyerData.state ?? null,
+      pincode: buyerData.postal_code ?? null,
+      country: buyerData.country ?? null,
+      is_active: true,
+      source_app: 'suite',
+    })
+    .select()
+    .single();
+  if (entityError) throw entityError;
+
+  const { data: role, error: roleError } = await supabase
+    .schema('registry')
+    .from('entity_roles')
+    .insert({
+      entity_id: entity.id,
+      company_id: companyId,
+      role: 'Customer',
+      is_active: true,
+    })
+    .select()
+    .single();
+  if (roleError) throw roleError;
+
+  return { entity, role };
+}
+
+// ─── Update buyer: update entity fields only ─────────────────────
+export async function updateBuyer(entityId, updates) {
+  const allowed = {
+    display_name: updates.name,
+    alias:        updates.alias,
+    gstin:        updates.gstin,
+    mobile:       updates.phone,
+    email:        updates.email,
+    address_line1: updates.address_line1,
+    address_line2: updates.address_line2,
+    city:         updates.city,
+    state:        updates.state,
+    pincode:      updates.postal_code,
+    country:      updates.country,
+    is_active:    updates.is_active,
+  };
+  Object.keys(allowed).forEach((k) => allowed[k] === undefined && delete allowed[k]);
   const { data, error } = await supabase
-    .from('buyers')
-    .insert(buyer)
+    .schema('registry')
+    .from('entities')
+    .update(allowed)
+    .eq('id', entityId)
     .select()
     .single();
   if (error) throw error;
   return data;
 }
 
-// ─── Update buyer ────────────────────────────────────────
-export async function updateBuyer(buyerId, updates) {
+// ─── Toggle buyer active state (entity_roles.is_active) ──────────
+// Deactivating a buyer role hides it from buyer lists without
+// deleting the shared entity record.
+export async function toggleBuyerActive(entityRoleId, isActive) {
   const { data, error } = await supabase
-    .from('buyers')
-    .update(updates)
-    .eq('id', buyerId)
+    .schema('registry')
+    .from('entity_roles')
+    .update({ is_active: isActive })
+    .eq('id', entityRoleId)
     .select()
     .single();
   if (error) throw error;
   return data;
 }
 
-// ─── Toggle buyer active/inactive ────────────────────────
-export async function toggleBuyerActive(buyerId, isActive) {
-  return updateBuyer(buyerId, { is_active: isActive });
-}

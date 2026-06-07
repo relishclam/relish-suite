@@ -13,12 +13,12 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar({ collapsed, mobileOpen, onToggle, onMobileClose }) {
-  const { profile } = useAuth();
+  const { activeRole } = useAuth();
   const location = useLocation();
 
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (!item.roles) return true;
-    return item.roles.includes(profile?.role);
+    return item.roles.includes(activeRole);
   });
 
   return (

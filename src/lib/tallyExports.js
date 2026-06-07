@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { supabaseApprovals } from './supabaseApprovals';
+import { supabaseApprovalsReadOnly } from './supabaseApprovals';
 
 // Map Suite company IDs to Approvals company IDs
 const APPROVALS_COMPANY_MAP = {
@@ -10,12 +10,12 @@ const APPROVALS_COMPANY_MAP = {
 // ─── Read approved vouchers from Approvals DB ────────────
 // READ ONLY — .select() ONLY — ZERO writes to Approvals DB
 export async function fetchApprovedVouchers(companyId, { from, to, limit = 200 } = {}) {
-  if (!supabaseApprovals) throw new Error('Approvals database not configured');
+  if (!supabaseApprovalsReadOnly) throw new Error('Approvals database not configured');
 
   const approvalsCompanyId = APPROVALS_COMPANY_MAP[companyId];
   if (!approvalsCompanyId) throw new Error(`No Approvals mapping for company: ${companyId}`);
 
-  let query = supabaseApprovals
+  let query = supabaseApprovalsReadOnly
     .from('vouchers')
     .select(`
       id, company_id, serial_number, head_of_account, sub_head_of_account,

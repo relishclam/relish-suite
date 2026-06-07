@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 // ─── List products for a company ─────────────────────────
 export async function fetchProducts(companyId, { search = '', activeOnly = true } = {}) {
   let query = supabase
+    .schema('suite')
     .from('products')
     .select('*')
     .eq('company_id', companyId)
@@ -19,6 +20,7 @@ export async function fetchProducts(companyId, { search = '', activeOnly = true 
 // ─── Get single product ──────────────────────────────────
 export async function fetchProduct(productId) {
   const { data, error } = await supabase
+    .schema('suite')
     .from('products')
     .select('*')
     .eq('id', productId)
@@ -30,6 +32,7 @@ export async function fetchProduct(productId) {
 // ─── Create product ──────────────────────────────────────
 export async function createProduct(product) {
   const { data, error } = await supabase
+    .schema('suite')
     .from('products')
     .insert(product)
     .select()
@@ -41,6 +44,7 @@ export async function createProduct(product) {
 // ─── Update product ──────────────────────────────────────
 export async function updateProduct(productId, updates) {
   const { data, error } = await supabase
+    .schema('suite')
     .from('products')
     .update(updates)
     .eq('id', productId)
