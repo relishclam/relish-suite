@@ -24,7 +24,7 @@ const TABS = [
 ];
 
 export default function MasterData() {
-  const { activeCompany, permissions, activeRole } = useAuth();
+  const { activeCompany, permissions, activeRole, user } = useAuth();
   const addToast = useToast();
 
   const [tab, setTab] = useState('companies');
@@ -146,8 +146,8 @@ export default function MasterData() {
         writeAuditLog({ companyId: activeCompany?.id, action: 'update', tableName, recordId: editing.id });
         addToast('Updated successfully', 'success');
       } else {
-        const created = await createFn(form);
-        writeAuditLog({ companyId: activeCompany?.id, action: 'create', tableName, recordId: created.id });
+        const created = await createFn({ ...form, company_id: activeCompany?.id, created_by: user?.id });
+        writeAuditLog({ companyId: activeCompany?.id, action: 'create', tableName, recordId: created?.id });
         addToast('Created successfully', 'success');
       }
       closeSlide();
@@ -569,7 +569,7 @@ export default function MasterData() {
               {inp('Product Name *', 'name', { span2: true })}
               {inp('Description', 'description', { span2: true, textarea: true })}
               {inp('HSN Code', 'hsn_code', { placeholder: '030739' })}
-              {inp('Unit', 'unit', { placeholder: 'MT' })}
+              {inp('Unit', 'default_unit', { placeholder: 'MT' })}
               {inp('Default Price', 'default_price', { type: 'number' })}
               {inp('Active', 'is_active', { toggle: true })}
             </div>
@@ -594,7 +594,7 @@ export default function MasterData() {
               {inp('Address Line 2', 'address_line2', { span2: true })}
               {inp('City', 'city')}
               {inp('State', 'state')}
-              {inp('Postal Code', 'postal_code')}
+              {inp('Postal Code', 'pincode')}
               {inp('Country', 'country')}
               {inp('Active', 'is_active', { toggle: true })}
             </div>
