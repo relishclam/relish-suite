@@ -334,7 +334,7 @@ export default function MasterData() {
               [
                 { key: 'name', label: 'Product Name' },
                 { key: 'hsn_code', label: 'HSN Code' },
-                { key: 'unit', label: 'Unit' },
+                { key: 'default_unit', label: 'Unit' },
                 { key: 'default_price', label: 'Default Price', className: 'text-right mono', render: (r) => r.default_price ? parseFloat(r.default_price).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—' },
                 { key: 'is_active', label: 'Status', render: (r) => <span className={`badge badge--${r.is_active ? 'success' : 'muted'}`}>{r.is_active ? 'Active' : 'Inactive'}</span> },
               ],
