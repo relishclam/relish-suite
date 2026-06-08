@@ -13,23 +13,20 @@ ClamFlow is the RHHF Panavally plant production app (currently in **test run, no
 
 ### 1.1 Does ClamFlow currently record shell output?
 
-Go to the ClamFlow Supabase project (`idwgenbkguejgwtzbicu`) and check for any of these tables:
+**CONFIRMED: NO.** The full ClamFlow processing pipeline has been inspected (2026-06-08):
 
-| Table name to look for | What it would contain |
-|---|---|
-| `production_batches` | Processing runs — clam in, meat + shell out |
-| `shift_records` / `shift_logs` | Per-shift production totals |
-| `processing_records` | Individual lot processing outcomes |
-| `yield_records` | Yield % tracking (meat yield, shell yield) |
-| `by_products` | Explicit by-product tracking |
-
-**SQL to list all tables in ClamFlow:**
-```sql
-SELECT table_schema, table_name
-FROM information_schema.tables
-WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-ORDER BY table_schema, table_name;
 ```
+lots (incoming raw clam)
+  └─► ppc_forms  (processing session — total_weight_kg = MEAT output only)
+        └─► fp_forms   (per-box processing — product_type, grade, weight)
+              └─► ppc_boxes  (final box — RFID tag, QR label)
+```
+
+None of these tables have `shell_weight_kg`, `shell_yield`, `by_product`, or any shell-related column.
+Shells are not weighed or recorded anywhere in ClamFlow.
+
+**Action required: ClamFlow team must add shell yield recording to their system.**
+Suite will read it (SELECT only) once it exists. Until then, CalciWorks sync remains disabled.
 
 ### 1.2 What fields are needed for CalciWorks shell receipt sync?
 

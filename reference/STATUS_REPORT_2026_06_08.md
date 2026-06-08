@@ -344,15 +344,15 @@ WHERE short_name = 'RFPL';
 
 | # | Item | Priority | Blocked By |
 |---|---|---|---|
-| P1 | Run `007_calciworks_shell_stock.sql` in Supabase | 🔴 High | Manual SQL step |
-| P2 | Seed GST Invoice counter at 35 in `sequence_counters` | 🔴 High | Manual SQL step |
-| P3 | Correct RFPL address/pincode in `registry.companies` | 🟡 Medium | Manual SQL step |
+| P1 | Run `007_calciworks_shell_stock.sql` in Supabase | ✅ Done | Table already existed |
+| P2 | Seed GST Invoice counter at 35 in `sequence_counters` | ✅ Done | Run 2026-06-08 |
+| P3 | Correct RFPL address/pincode in `registry.companies` | ✅ Done | Run 2026-06-08 |
 | P4 | Smoke test all Master Data forms end-to-end | 🟡 Medium | — |
 | P5 | Smoke test Purchase Order full workflow | 🟡 Medium | — |
 | P6 | Smoke test Commercial Invoice full workflow | 🟡 Medium | — |
 | P7 | Smoke test Tally Export with live vouchers | 🟡 Medium | — |
-| P8 | Inspect ClamFlow tables to confirm shell yield column exists | 🔵 Planning | Motty to run SQL query |
-| P9 | CalciWorks — enable "Sync from ClamFlow" button | 🔵 Planning | Blocked by P8 |
+| P8 | ClamFlow shell data: **CONFIRMED — no shell yield data exists in ClamFlow**. `ppc_forms.total_weight_kg` = meat output only. Shells not weighed or recorded. ClamFlow team must add this before sync is possible. | ✅ Closed | No action in Suite |
+| P9 | CalciWorks — "Sync from ClamFlow" button | ⏸️ Suspended | ClamFlow has no shell data |
 | P10 | Onboarding module in Suite | 🔵 Planning | Blocked by ClamFlow table inspection |
 | P11 | CalciWorks Sales Invoice (RHHF/CalciWorks Division branding) | 🔵 Planning | — |
 | P12 | Pramaana (Accounts/Vouchers module) | 🔵 Future | Approvals DB audit required first |
