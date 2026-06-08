@@ -20,6 +20,7 @@ import MasterData from './pages/MasterData';
 import UserManagement from './pages/UserManagement';
 import GSTInvoices from './pages/GSTInvoices';
 import GSTInvoiceForm from './pages/GSTInvoiceForm';
+import CalciWorks from './pages/CalciWorks';
 import Settings from './pages/Settings';
 
 export default function App() {
@@ -46,6 +47,8 @@ export default function App() {
         <Route path="/gst-invoices" element={<GSTInvoices />} />
         <Route path="/gst-invoices/new" element={<ProtectedRoute roles={['super_admin', 'admin', 'operations']}><GSTInvoiceForm /></ProtectedRoute>} />
         <Route path="/gst-invoices/:id/edit" element={<ProtectedRoute roles={['super_admin', 'admin', 'operations']}><GSTInvoiceForm /></ProtectedRoute>} />
+
+        <Route path="/calciworks" element={<ProtectedRoute roles={['super_admin', 'admin', 'operations']}><CalciWorks /></ProtectedRoute>} />
 
         <Route path="/master-data" element={<MasterData />} />
 

@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/invoices', label: 'Invoices', icon: '📄' },
   { to: '/tally-export', label: 'Tally Export', icon: '💼', roles: ['super_admin', 'admin', 'accounts'] },
   { to: '/gst-invoices', label: 'GST Invoices', icon: '🧾' },
+  { to: '/calciworks', label: 'CalciWorks', icon: '🐚', roles: ['super_admin', 'admin', 'operations'] },
   { to: '/master-data', label: 'Master Data', icon: '🗂️' },
   { to: '/admin/users', label: 'User Management', icon: '👥', roles: ['super_admin'] },
   { to: '/settings', label: 'Settings', icon: '⚙️' },

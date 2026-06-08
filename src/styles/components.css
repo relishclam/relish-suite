@@ -2022,3 +2022,43 @@
   font-size: 1.375rem;
   margin: 0 0 1.25rem;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   CALCIWORKS — KPI cards + form helpers
+   ════════════════════════════════════════════════════════════ */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+}
+.kpi-card__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+.kpi-card__value {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  color: var(--navy);
+  line-height: 1.1;
+}
+.kpi-card__unit {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+.form-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
