@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 // ─── Write audit log entry ───────────────────────────────
 export async function writeAuditLog({ companyId, action, tableName, recordId, oldData, newData }) {
   const { error } = await supabase
+    .schema('registry')
     .from('audit_log')
     .insert({
       company_id: companyId,
@@ -18,8 +19,9 @@ export async function writeAuditLog({ companyId, action, tableName, recordId, ol
 // ─── Read audit log for a company ────────────────────────
 export async function fetchAuditLog(companyId, { tableName, limit = 100, offset = 0 } = {}) {
   let query = supabase
+    .schema('registry')
     .from('audit_log')
-    .select('*, profiles(full_name)', { count: 'exact' })
+    .select('*', { count: 'exact' })
     .eq('company_id', companyId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
