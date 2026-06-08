@@ -12,14 +12,21 @@ import {
 } from '../lib/shellStock';
 
 // ── Constants ──────────────────────────────────────────────────────
+// 'receipt' is intentionally excluded from manual entry types —
+// shell receipts come from ClamFlow production batches, not manual input.
 const ENTRY_TYPES = [
-  { value: 'receipt',     label: 'Receipt',     direction: 'in',  color: 'badge--success' },
   { value: 'consumption', label: 'Consumption', direction: 'out', color: 'badge--muted'   },
   { value: 'sale',        label: 'Sale',        direction: 'out', color: 'badge--info'    },
   { value: 'adjustment',  label: 'Adjustment',  direction: null,  color: 'badge--warning' },
 ];
 
-const TYPE_META = Object.fromEntries(ENTRY_TYPES.map((t) => [t.value, t]));
+// All entry types (including receipt) for display in the ledger table
+const ALL_TYPE_META = {
+  receipt:     { label: 'Receipt',     color: 'badge--success' },
+  consumption: { label: 'Consumption', color: 'badge--muted'   },
+  sale:        { label: 'Sale',        color: 'badge--info'    },
+  adjustment:  { label: 'Adjustment',  color: 'badge--warning' },
+};
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -33,8 +40,8 @@ const fmtQty = (v) => {
 
 const EMPTY_FORM = {
   entry_date:  today(),
-  entry_type:  'receipt',
-  direction:   'in',
+  entry_type:  'consumption',
+  direction:   'out',
   quantity_kg: '',
   ref_batch:   '',
   ref_invoice: '',
@@ -193,11 +200,33 @@ export default function CalciWorks() {
             Shell Stock Ledger · RHHF Division · {activeCompany?.short_name}
           </p>
         </div>
-        {canEdit && (
-          <button type="button" className="btn btn-primary" onClick={openNew}>
-            + New Entry
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled
+            title="ClamFlow production batch sync coming soon"
+            style={{ opacity: 0.5, cursor: 'not-allowed' }}
+          >
+            🔄 Sync from ClamFlow
           </button>
-        )}
+          {canEdit && (
+            <button type="button" className="btn btn-primary" onClick={openNew}>
+              + New Entry
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ClamFlow sync notice */}
+      <div style={{
+        background: '#fffbeb', border: '1px solid #f5c342', borderRadius: 'var(--radius)',
+        padding: '0.75rem 1rem', fontSize: '0.85rem', color: '#92670a', marginBottom: '0.5rem'
+      }}>
+        <strong>Shell receipts sync automatically from ClamFlow production batches.</strong>{' '}
+        Manual receipt entry is disabled. Consumption, sales and adjustments can be entered here.
+        <br />
+        <span style={{ fontSize: '0.78rem' }}>ClamFlow sync will be enabled once production batch recording is active in ClamFlow.</span>
       </div>
 
       {/* KPI Cards */}
@@ -260,8 +289,8 @@ export default function CalciWorks() {
                 >
                   <td>{fmtDate(e.entry_date)}</td>
                   <td>
-                    <span className={`badge ${TYPE_META[e.entry_type]?.color || 'badge--muted'}`}>
-                      {TYPE_META[e.entry_type]?.label || e.entry_type}
+                    <span className={`badge ${ALL_TYPE_META[e.entry_type]?.color || 'badge--muted'}`}>
+                      {ALL_TYPE_META[e.entry_type]?.label || e.entry_type}
                     </span>
                   </td>
                   <td>
@@ -321,9 +350,8 @@ export default function CalciWorks() {
               ))}
             </select>
             <p className="form-hint">
-              {form.entry_type === 'receipt'     && 'Shells received from clam processing batch (stock in)'}
               {form.entry_type === 'consumption' && 'Shells consumed internally for processing (stock out)'}
-              {form.entry_type === 'sale'        && 'Shells sold to external buyer (stock out)'}
+              {form.entry_type === 'sale'        && 'Shells sold to external buyer — link to CalciWorks sales invoice (stock out)'}
               {form.entry_type === 'adjustment'  && 'Manual stock correction — specify direction below'}
             </p>
           </div>
@@ -357,20 +385,6 @@ export default function CalciWorks() {
             />
           </div>
 
-          {/* Batch Ref — shown for receipt */}
-          {form.entry_type === 'receipt' && (
-            <div className="form-group">
-              <label className="form-label">Batch / Lot Ref</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="e.g. CF-LOT-2026-001"
-                value={form.ref_batch}
-                onChange={(e) => setForm((f) => ({ ...f, ref_batch: e.target.value }))}
-              />
-              <p className="form-hint">ClamFlow lot or batch reference number</p>
-            </div>
-          )}
 
           {/* Invoice Ref — shown for sale */}
           {form.entry_type === 'sale' && (
