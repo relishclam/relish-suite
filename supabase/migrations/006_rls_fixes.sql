@@ -85,3 +85,14 @@ ALTER POLICY via_invoice ON suite.invoice_line_items
 ALTER POLICY via_invoice_packing ON suite.invoice_packing_lines
   USING (invoice_id IN (SELECT id FROM suite.invoices WHERE registry.has_company_access(company_id)))
   WITH CHECK (invoice_id IN (SELECT id FROM suite.invoices WHERE registry.has_company_access(company_id)));
+
+-- ── Step 6: Grant write access on registry tables ─────────────────
+-- 005_rls_and_grants.sql only issued GRANT SELECT on ALL TABLES in
+-- registry. That means INSERT/UPDATE/DELETE on entities, entity_roles,
+-- company_users, profiles, and companies all fail with 403 Forbidden.
+-- Applied 2026-06-08.
+GRANT INSERT, UPDATE, DELETE ON registry.entities       TO authenticated;
+GRANT INSERT, UPDATE, DELETE ON registry.entity_roles   TO authenticated;
+GRANT INSERT, UPDATE, DELETE ON registry.company_users  TO authenticated;
+GRANT UPDATE                 ON registry.profiles        TO authenticated;
+GRANT UPDATE                 ON registry.companies       TO authenticated;
