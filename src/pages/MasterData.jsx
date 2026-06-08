@@ -140,13 +140,17 @@ export default function MasterData() {
   // ── Generic save ──
   const handleSave = async (createFn, updateFn, tableName) => {
     setSaving(true);
+    // Convert empty strings to null so numeric/uuid columns don't get a 400
+    const sanitize = (obj) => Object.fromEntries(
+      Object.entries(obj).map(([k, v]) => [k, v === '' ? null : v])
+    );
     try {
       if (editing) {
-        await updateFn(editing.id, form);
+        await updateFn(editing.id, sanitize(form));
         writeAuditLog({ companyId: activeCompany?.id, action: 'update', tableName, recordId: editing.id });
         addToast('Updated successfully', 'success');
       } else {
-        const created = await createFn({ ...form, company_id: activeCompany?.id, created_by: user?.id });
+        const created = await createFn(sanitize({ ...form, company_id: activeCompany?.id, created_by: user?.id }));
         writeAuditLog({ companyId: activeCompany?.id, action: 'create', tableName, recordId: created?.id });
         addToast('Created successfully', 'success');
       }
