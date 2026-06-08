@@ -224,24 +224,32 @@ ALTER TABLE suite.activity_feed         ENABLE ROW LEVEL SECURITY;
 
 -- ── purchase_orders ───────────────────────────────────────────────
 CREATE POLICY company_isolation ON suite.purchase_orders
-  USING (registry.has_company_access(company_id));
+  USING (registry.has_company_access(company_id))
+  WITH CHECK (registry.has_company_access(company_id));
 
 -- ── invoices ─────────────────────────────────────────────────────
 CREATE POLICY company_isolation ON suite.invoices
-  USING (registry.has_company_access(company_id));
+  USING (registry.has_company_access(company_id))
+  WITH CHECK (registry.has_company_access(company_id));
 
 -- ── products ─────────────────────────────────────────────────────
 CREATE POLICY company_isolation ON suite.products
-  USING (registry.has_company_access(company_id));
+  USING (registry.has_company_access(company_id))
+  WITH CHECK (registry.has_company_access(company_id));
 
 -- ── delivery_addresses ────────────────────────────────────────────
 CREATE POLICY company_isolation ON suite.delivery_addresses
-  USING (registry.has_company_access(company_id));
+  USING (registry.has_company_access(company_id))
+  WITH CHECK (registry.has_company_access(company_id));
 
 -- ── kpi_snapshots ─────────────────────────────────────────────────
 -- NULL company_id = group-level KPI, visible to all authenticated users.
 CREATE POLICY company_isolation ON suite.kpi_snapshots
   USING (
+    company_id IS NULL
+    OR registry.has_company_access(company_id)
+  )
+  WITH CHECK (
     company_id IS NULL
     OR registry.has_company_access(company_id)
   );
@@ -251,12 +259,22 @@ CREATE POLICY company_isolation ON suite.activity_feed
   USING (
     company_id IS NULL
     OR registry.has_company_access(company_id)
+  )
+  WITH CHECK (
+    company_id IS NULL
+    OR registry.has_company_access(company_id)
   );
 
 -- ── po_line_items ─────────────────────────────────────────────────
 -- Inherit access through parent purchase_order.
 CREATE POLICY via_purchase_order ON suite.po_line_items
   USING (
+    po_id IN (
+      SELECT id FROM suite.purchase_orders
+      WHERE registry.has_company_access(company_id)
+    )
+  )
+  WITH CHECK (
     po_id IN (
       SELECT id FROM suite.purchase_orders
       WHERE registry.has_company_access(company_id)
@@ -271,12 +289,25 @@ CREATE POLICY via_invoice ON suite.invoice_line_items
       SELECT id FROM suite.invoices
       WHERE registry.has_company_access(company_id)
     )
+  )
+  WITH CHECK (
+    invoice_id IN (
+      SELECT id FROM suite.invoices
+      WHERE registry.has_company_access(company_id)
+    )
+  );
   );
 
 -- ── invoice_packing_lines ─────────────────────────────────────────
 -- Inherit access through parent invoice.
 CREATE POLICY via_invoice_packing ON suite.invoice_packing_lines
   USING (
+    invoice_id IN (
+      SELECT id FROM suite.invoices
+      WHERE registry.has_company_access(company_id)
+    )
+  )
+  WITH CHECK (
     invoice_id IN (
       SELECT id FROM suite.invoices
       WHERE registry.has_company_access(company_id)

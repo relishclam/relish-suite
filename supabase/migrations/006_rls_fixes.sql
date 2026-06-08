@@ -45,3 +45,43 @@ CREATE POLICY company_users_visibility ON registry.company_users
 -- All authenticated users should be able to read the company list;
 -- row-level isolation is not needed here.
 ALTER TABLE registry.companies DISABLE ROW LEVEL SECURITY;
+
+-- ── Step 5: Add WITH CHECK to suite table RLS policies ───────────
+-- The original suite policies only had USING clauses, which cover
+-- SELECT/UPDATE/DELETE but NOT INSERT. All inserts were blocked
+-- with 400 Bad Request. Applied 2026-06-08.
+ALTER POLICY company_isolation ON suite.purchase_orders
+  USING (registry.has_company_access(company_id))
+  WITH CHECK (registry.has_company_access(company_id));
+
+ALTER POLICY company_isolation ON suite.invoices
+  USING (registry.has_company_access(company_id))
+  WITH CHECK (registry.has_company_access(company_id));
+
+ALTER POLICY company_isolation ON suite.products
+  USING (registry.has_company_access(company_id))
+  WITH CHECK (registry.has_company_access(company_id));
+
+ALTER POLICY company_isolation ON suite.delivery_addresses
+  USING (registry.has_company_access(company_id))
+  WITH CHECK (registry.has_company_access(company_id));
+
+ALTER POLICY company_isolation ON suite.kpi_snapshots
+  USING (company_id IS NULL OR registry.has_company_access(company_id))
+  WITH CHECK (company_id IS NULL OR registry.has_company_access(company_id));
+
+ALTER POLICY company_isolation ON suite.activity_feed
+  USING (company_id IS NULL OR registry.has_company_access(company_id))
+  WITH CHECK (company_id IS NULL OR registry.has_company_access(company_id));
+
+ALTER POLICY via_purchase_order ON suite.po_line_items
+  USING (po_id IN (SELECT id FROM suite.purchase_orders WHERE registry.has_company_access(company_id)))
+  WITH CHECK (po_id IN (SELECT id FROM suite.purchase_orders WHERE registry.has_company_access(company_id)));
+
+ALTER POLICY via_invoice ON suite.invoice_line_items
+  USING (invoice_id IN (SELECT id FROM suite.invoices WHERE registry.has_company_access(company_id)))
+  WITH CHECK (invoice_id IN (SELECT id FROM suite.invoices WHERE registry.has_company_access(company_id)));
+
+ALTER POLICY via_invoice_packing ON suite.invoice_packing_lines
+  USING (invoice_id IN (SELECT id FROM suite.invoices WHERE registry.has_company_access(company_id)))
+  WITH CHECK (invoice_id IN (SELECT id FROM suite.invoices WHERE registry.has_company_access(company_id)));
