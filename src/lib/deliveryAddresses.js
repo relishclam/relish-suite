@@ -36,15 +36,12 @@ export async function createDeliveryAddress(address) {
 
 // ─── Update delivery address ─────────────────────────────
 export async function updateDeliveryAddress(addressId, updates) {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .schema('suite')
     .from('delivery_addresses')
     .update(updates)
-    .eq('id', addressId)
-    .select()
-    .single();
+    .eq('id', addressId);
   if (error) throw error;
-  return data;
 }
 
 // ─── Toggle active/inactive ──────────────────────────────

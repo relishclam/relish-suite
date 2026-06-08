@@ -75,18 +75,17 @@ export async function createInvoice(invoice, lineItems, packingLines = [], compa
     });
   if (seqError) throw seqError;
 
-  const { data: newInv, error: invError } = await supabase
+  const invoiceId = crypto.randomUUID();
+  const { error: invError } = await supabase
     .schema('suite')
     .from('invoices')
-    .insert({ ...invoice, invoice_number: invoiceNumber })
-    .select()
-    .single();
+    .insert({ id: invoiceId, ...invoice, invoice_number: invoiceNumber });
   if (invError) throw invError;
 
   if (lineItems?.length) {
     const lines = lineItems.map((li, idx) => ({
       ...li,
-      invoice_id: newInv.id,
+      invoice_id: invoiceId,
       line_number: idx + 1,
     }));
     const { error: liError } = await supabase
@@ -99,7 +98,7 @@ export async function createInvoice(invoice, lineItems, packingLines = [], compa
   if (packingLines?.length) {
     const pLines = packingLines.map((pl, idx) => ({
       ...pl,
-      invoice_id: newInv.id,
+      invoice_id: invoiceId,
       line_number: idx + 1,
     }));
     const { error: plError } = await supabase
@@ -109,7 +108,7 @@ export async function createInvoice(invoice, lineItems, packingLines = [], compa
     if (plError) throw plError;
   }
 
-  return fetchInvoice(newInv.id);
+  return fetchInvoice(invoiceId);
 }
 
 // ─── Update invoice + replace line items + packing lines ─────────

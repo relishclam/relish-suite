@@ -33,15 +33,12 @@ export async function updateProfile(userId, updates) {
   if (email      !== undefined) safe.email      = email;
   if (mobile     !== undefined) safe.mobile     = mobile;
   if (is_active  !== undefined) safe.is_active  = is_active;
-  const { data, error } = await supabase
+  const { error } = await supabase
     .schema('registry')
     .from('profiles')
     .update(safe)
-    .eq('id', userId)
-    .select()
-    .single();
+    .eq('id', userId);
   if (error) throw error;
-  return data;
 }
 
 // ─── Get company assignments for a user ──────────────────

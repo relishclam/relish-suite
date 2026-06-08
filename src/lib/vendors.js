@@ -42,10 +42,12 @@ export async function fetchVendor(entityId) {
 
 // ─── Create vendor: insert entity then entity_role ────────────────
 export async function createVendor(companyId, vendorData) {
-  const { data: entity, error: entityError } = await supabase
+  const entityId = crypto.randomUUID();
+  const { error: entityError } = await supabase
     .schema('registry')
     .from('entities')
     .insert({
+      id: entityId,
       type: 'ORGANISATION',
       display_name: vendorData.name,
       alias: vendorData.vendor_code ?? null,
@@ -60,25 +62,40 @@ export async function createVendor(companyId, vendorData) {
       bank_name: vendorData.bank_details ?? null,
       is_active: true,
       source_app: 'suite',
-    })
-    .select()
-    .single();
+    });
   if (entityError) throw entityError;
 
-  const { data: role, error: roleError } = await supabase
+  const roleId = crypto.randomUUID();
+  const { error: roleError } = await supabase
     .schema('registry')
     .from('entity_roles')
     .insert({
-      entity_id: entity.id,
+      id: roleId,
+      entity_id: entityId,
       company_id: companyId,
       role: 'Vendor',
       is_active: true,
-    })
-    .select()
-    .single();
+    });
   if (roleError) throw roleError;
 
-  return { entity, role };
+  return { entity: { id: entityId }, role: { id: roleId } };
+}
+  if (entityError) throw entityError;
+
+  const roleId = crypto.randomUUID();
+  const { error: roleError } = await supabase
+    .schema('registry')
+    .from('entity_roles')
+    .insert({
+      id: roleId,
+      entity_id: entityId,
+      company_id: companyId,
+      role: 'Vendor',
+      is_active: true,
+    });
+  if (roleError) throw roleError;
+
+  return { entity: { id: entityId }, role: { id: roleId } };
 }
 
 // ─── Update vendor: update entity fields only ────────────────────
@@ -98,29 +115,23 @@ export async function updateVendor(entityId, updates) {
     is_active:    updates.is_active,
   };
   Object.keys(allowed).forEach((k) => allowed[k] === undefined && delete allowed[k]);
-  const { data, error } = await supabase
+  const { error } = await supabase
     .schema('registry')
     .from('entities')
     .update(allowed)
-    .eq('id', entityId)
-    .select()
-    .single();
+    .eq('id', entityId);
   if (error) throw error;
-  return data;
 }
 
 // ─── Toggle vendor active state (entity_roles.is_active) ─────────
 // Deactivating a vendor role hides it from vendor lists without
 // deleting the shared entity record.
 export async function toggleVendorActive(entityRoleId, isActive) {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .schema('registry')
     .from('entity_roles')
     .update({ is_active: isActive })
-    .eq('id', entityRoleId)
-    .select()
-    .single();
+    .eq('id', entityRoleId);
   if (error) throw error;
-  return data;
 }
 

@@ -40,15 +40,12 @@ export async function createProduct(product) {
 
 // ─── Update product ──────────────────────────────────────
 export async function updateProduct(productId, updates) {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .schema('suite')
     .from('products')
     .update(updates)
-    .eq('id', productId)
-    .select()
-    .single();
+    .eq('id', productId);
   if (error) throw error;
-  return data;
 }
 
 // ─── Toggle product active/inactive ──────────────────────

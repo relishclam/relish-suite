@@ -26,13 +26,10 @@ export async function fetchCompany(companyId) {
 
 // ─── Update company (super_admin only) ───────────────────
 export async function updateCompany(companyId, updates) {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .schema('registry')
     .from('companies')
     .update(updates)
-    .eq('id', companyId)
-    .select()
-    .single();
+    .eq('id', companyId);
   if (error) throw error;
-  return data;
 }

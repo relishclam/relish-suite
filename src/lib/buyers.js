@@ -41,10 +41,12 @@ export async function fetchBuyer(entityId) {
 
 // ─── Create buyer: insert entity then entity_role ─────────────────
 export async function createBuyer(companyId, buyerData) {
-  const { data: entity, error: entityError } = await supabase
+  const entityId = crypto.randomUUID();
+  const { error: entityError } = await supabase
     .schema('registry')
     .from('entities')
     .insert({
+      id: entityId,
       type: 'ORGANISATION',
       display_name: buyerData.name,
       alias: buyerData.alias ?? null,
@@ -59,25 +61,23 @@ export async function createBuyer(companyId, buyerData) {
       country: buyerData.country ?? null,
       is_active: true,
       source_app: 'suite',
-    })
-    .select()
-    .single();
+    });
   if (entityError) throw entityError;
 
-  const { data: role, error: roleError } = await supabase
+  const roleId = crypto.randomUUID();
+  const { error: roleError } = await supabase
     .schema('registry')
     .from('entity_roles')
     .insert({
-      entity_id: entity.id,
+      id: roleId,
+      entity_id: entityId,
       company_id: companyId,
       role: 'Customer',
       is_active: true,
-    })
-    .select()
-    .single();
+    });
   if (roleError) throw roleError;
 
-  return { entity, role };
+  return { entity: { id: entityId }, role: { id: roleId } };
 }
 
 // ─── Update buyer: update entity fields only ─────────────────────
@@ -97,29 +97,23 @@ export async function updateBuyer(entityId, updates) {
     is_active:    updates.is_active,
   };
   Object.keys(allowed).forEach((k) => allowed[k] === undefined && delete allowed[k]);
-  const { data, error } = await supabase
+  const { error } = await supabase
     .schema('registry')
     .from('entities')
     .update(allowed)
-    .eq('id', entityId)
-    .select()
-    .single();
+    .eq('id', entityId);
   if (error) throw error;
-  return data;
 }
 
 // ─── Toggle buyer active state (entity_roles.is_active) ──────────
 // Deactivating a buyer role hides it from buyer lists without
 // deleting the shared entity record.
 export async function toggleBuyerActive(entityRoleId, isActive) {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .schema('registry')
     .from('entity_roles')
     .update({ is_active: isActive })
-    .eq('id', entityRoleId)
-    .select()
-    .single();
+    .eq('id', entityRoleId);
   if (error) throw error;
-  return data;
 }
 

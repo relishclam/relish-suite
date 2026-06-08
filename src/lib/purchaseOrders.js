@@ -66,18 +66,17 @@ export async function createPurchaseOrder(po, lineItems, company) {
     });
   if (seqError) throw seqError;
 
-  const { data: newPo, error: poError } = await supabase
+  const poId = crypto.randomUUID();
+  const { error: poError } = await supabase
     .schema('suite')
     .from('purchase_orders')
-    .insert({ ...po, po_number: poNumber })
-    .select()
-    .single();
+    .insert({ id: poId, ...po, po_number: poNumber });
   if (poError) throw poError;
 
   if (lineItems?.length) {
     const lines = lineItems.map((li, idx) => ({
       ...li,
-      po_id: newPo.id,
+      po_id: poId,
       line_number: idx + 1,
     }));
     const { error: liError } = await supabase
@@ -87,7 +86,7 @@ export async function createPurchaseOrder(po, lineItems, company) {
     if (liError) throw liError;
   }
 
-  return fetchPurchaseOrder(newPo.id);
+  return fetchPurchaseOrder(poId);
 }
 
 // ─── Update PO + replace line items ──────────────────────────────
