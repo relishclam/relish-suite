@@ -55,14 +55,11 @@ export async function fetchUserCompanies(userId) {
 // ─── Assign user to a company ────────────────────────────
 // role defaults to 'viewer' — company_users.role is NOT NULL
 export async function assignUserCompany(userId, companyId, role = 'viewer') {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .schema('registry')
     .from('company_users')
-    .insert({ user_id: userId, company_id: companyId, role })
-    .select()
-    .single();
+    .insert({ user_id: userId, company_id: companyId, role });
   if (error) throw error;
-  return data;
 }
 
 // ─── Remove user from a company ──────────────────────────

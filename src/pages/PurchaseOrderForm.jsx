@@ -298,7 +298,7 @@ export default function PurchaseOrderForm() {
       const a = deliveryAddrs.find((x) => x.id === addrId);
       if (a) {
         setDeliveryAddress(
-          [a.address_line1, a.address_line2, [a.city, a.state, a.postal_code].filter(Boolean).join(', '), a.country]
+          [a.address_line1, a.address_line2, [a.city, a.state, a.pincode].filter(Boolean).join(', '), a.country]
             .filter(Boolean)
             .join(', ')
         );
@@ -330,7 +330,7 @@ export default function PurchaseOrderForm() {
               ...l,
               description: p.name || '',
               hsn_code: p.hsn_code || '',
-              unit: p.unit || 'MT',
+              unit: p.default_unit || 'MT',
               price: String(p.default_price ?? ''),
             }
           : l

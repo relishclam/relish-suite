@@ -125,15 +125,12 @@ export async function updatePurchaseOrder(poId, updates, lineItems) {
 
 // ─── Update PO status ────────────────────────────────────────────
 export async function updatePurchaseOrderStatus(poId, status) {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .schema('suite')
     .from('purchase_orders')
     .update({ status })
-    .eq('id', poId)
-    .select()
-    .single();
+    .eq('id', poId);
   if (error) throw error;
-  return data;
 }
 
 // ─── PO Line Item Calculations ───────────────────────────────────

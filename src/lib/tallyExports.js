@@ -1,10 +1,10 @@
 import { supabase } from './supabase';
 import { supabaseApprovalsReadOnly } from './supabaseApprovals';
 
-// Map Suite company IDs to Approvals company IDs
+// Map Suite company UUIDs to Approvals company IDs
 const APPROVALS_COMPANY_MAP = {
-  rhhf: 'relish-hhc',
-  rfpl: 'relish-foods',
+  'b8beb440-df7f-48e8-a012-ac5750502eca': 'relish-hhc',  // RHHF
+  'bc455c94-0bcd-4d66-a040-d29ed880d22f': 'relish-foods', // RFPL
 };
 
 // ─── Read approved vouchers from Approvals DB ────────────
@@ -45,6 +45,7 @@ export async function fetchApprovedVouchers(companyId, { from, to, limit = 200 }
 // ─── Fetch voucher IDs already exported for this company ─
 export async function fetchExportedVoucherIds(companyId) {
   const { data, error } = await supabase
+    .schema('suite')
     .from('tally_exports')
     .select('voucher_id, exported_at')
     .eq('company_id', companyId)
@@ -58,6 +59,7 @@ export async function fetchExportedVoucherIds(companyId) {
 // ─── List tally exports for a company ────────────────────
 export async function fetchTallyExports(companyId, { limit = 100, offset = 0 } = {}) {
   const { data, error, count } = await supabase
+    .schema('suite')
     .from('tally_exports')
     .select('*', { count: 'exact' })
     .eq('company_id', companyId)
@@ -70,6 +72,7 @@ export async function fetchTallyExports(companyId, { limit = 100, offset = 0 } =
 // ─── Create batch of tally export records ────────────────
 export async function createBatchExport(records) {
   const { data, error } = await supabase
+    .schema('suite')
     .from('tally_exports')
     .insert(records)
     .select();
@@ -79,23 +82,19 @@ export async function createBatchExport(records) {
 
 // ─── Create tally export record ──────────────────────────
 export async function createTallyExport(exportRecord) {
-  const { data, error } = await supabase
+  const { error } = await supabase
+    .schema('suite')
     .from('tally_exports')
-    .insert(exportRecord)
-    .select()
-    .single();
+    .insert(exportRecord);
   if (error) throw error;
-  return data;
 }
 
 // ─── Update tally export (e.g., mark as synced) ──────────
 export async function updateTallyExport(exportId, updates) {
-  const { data, error } = await supabase
+  const { error } = await supabase
+    .schema('suite')
     .from('tally_exports')
     .update(updates)
-    .eq('id', exportId)
-    .select()
-    .single();
+    .eq('id', exportId);
   if (error) throw error;
-  return data;
 }

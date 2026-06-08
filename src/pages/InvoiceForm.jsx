@@ -304,7 +304,7 @@ export default function InvoiceForm() {
     const p = products.find((x) => x.id === productId);
     if (!p) return;
     setLines((prev) => prev.map((l, i) =>
-      i === idx ? { ...l, description: p.name || '', hsn_code: p.hsn_code || '', unit: p.unit || 'MT', rate: String(p.default_price ?? '') } : l
+      i === idx ? { ...l, description: p.name || '', hsn_code: p.hsn_code || '', unit: p.default_unit || 'MT', rate: String(p.default_price ?? '') } : l
     ));
   };
 

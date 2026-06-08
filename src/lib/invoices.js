@@ -169,15 +169,12 @@ export async function updateInvoice(invoiceId, updates, lineItems, packingLines)
 
 // ─── Update invoice status ───────────────────────────────────────
 export async function updateInvoiceStatus(invoiceId, status) {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .schema('suite')
     .from('invoices')
     .update({ status })
-    .eq('id', invoiceId)
-    .select()
-    .single();
+    .eq('id', invoiceId);
   if (error) throw error;
-  return data;
 }
 
 // ─── Invoice Line Item Calculations ──────────────────────────────
