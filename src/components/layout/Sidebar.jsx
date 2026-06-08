@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { to: '/purchase-orders', label: 'Purchase Orders', icon: '📋' },
   { to: '/invoices', label: 'Invoices', icon: '📄' },
   { to: '/tally-export', label: 'Tally Export', icon: '💼', roles: ['super_admin', 'admin', 'accounts'] },
+  { to: '/gst-invoices', label: 'GST Invoices', icon: '🧾' },
   { to: '/master-data', label: 'Master Data', icon: '🗂️' },
   { to: '/admin/users', label: 'User Management', icon: '👥', roles: ['super_admin'] },
   { to: '/settings', label: 'Settings', icon: '⚙️' },

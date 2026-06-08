@@ -1,3 +1,122 @@
+/* ─── GST Invoice Form ───────────────────── */
+.gst-form {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.gst-form__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.gst-form__title {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  color: var(--navy);
+  margin: 0;
+}
+.gst-form__actions,
+.gst-form__footer {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.gst-form__footer {
+  justify-content: flex-end;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+.gst-section__title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--navy);
+  background: var(--bg-subtle);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 1rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+.gst-section__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.gst-section__title-row .gst-section__title {
+  margin-bottom: 0;
+}
+.gst-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.gst-table th {
+  background: var(--bg-subtle);
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+.gst-table td {
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.gst-table .form-input--sm {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+  width: 100%;
+}
+.gst-totals {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.gst-totals__left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 55%;
+}
+.gst-totals__right {
+  min-width: 260px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+}
+.gst-totals__row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.gst-totals__row--total {
+  font-weight: 700;
+  font-size: 1rem;
+  border-bottom: none;
+  padding-top: 0.5rem;
+  color: var(--navy);
+}
+
 /* ─── Buttons ─────────────────────────────── */
 .btn {
   display: inline-flex;
