@@ -36,15 +36,21 @@ export async function fetchGSTInvoice(invoiceId) {
 }
 
 // ─── Create GST invoice with line items ──────────────────
+// Numbering format: INV001, INV002 … (continues existing RFPL series, never resets by year)
+// Sequence stored with p_year=9999 so it never rolls over. Seed counter at 35 in DB first.
 export async function createGSTInvoice(invoice, lineItems, company) {
-  const { data: invoiceNumber, error: seqError } = await supabase
+  const { data: seqResult, error: seqError } = await supabase
     .schema('registry')
     .rpc('next_cal_sequence', {
       p_company_id:   company.id,
       p_company_code: company.code,
-      p_prefix:       'GSTI',
+      p_prefix:       'INV',
+      p_year:         9999,
     });
   if (seqError) throw seqError;
+  // seqResult → 'RFPL/INV/9999/0036'; extract the number and reformat as INV036
+  const seqNum = parseInt(seqResult.split('/').pop(), 10);
+  const invoiceNumber = 'INV' + String(seqNum).padStart(3, '0');
 
   const invoiceId = crypto.randomUUID();
   const { error: invError } = await supabase
