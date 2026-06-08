@@ -80,23 +80,6 @@ export async function createVendor(companyId, vendorData) {
 
   return { entity: { id: entityId }, role: { id: roleId } };
 }
-  if (entityError) throw entityError;
-
-  const roleId = crypto.randomUUID();
-  const { error: roleError } = await supabase
-    .schema('registry')
-    .from('entity_roles')
-    .insert({
-      id: roleId,
-      entity_id: entityId,
-      company_id: companyId,
-      role: 'Vendor',
-      is_active: true,
-    });
-  if (roleError) throw roleError;
-
-  return { entity: { id: entityId }, role: { id: roleId } };
-}
 
 // ─── Update vendor: update entity fields only ────────────────────
 export async function updateVendor(entityId, updates) {
