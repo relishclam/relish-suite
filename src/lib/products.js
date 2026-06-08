@@ -31,14 +31,11 @@ export async function fetchProduct(productId) {
 
 // ─── Create product ──────────────────────────────────────
 export async function createProduct(product) {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .schema('suite')
     .from('products')
-    .insert(product)
-    .select()
-    .single();
+    .insert(product);
   if (error) throw error;
-  return data;
 }
 
 // ─── Update product ──────────────────────────────────────

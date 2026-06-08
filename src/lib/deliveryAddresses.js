@@ -27,14 +27,11 @@ export async function fetchDeliveryAddress(addressId) {
 
 // ─── Create delivery address ─────────────────────────────
 export async function createDeliveryAddress(address) {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .schema('suite')
     .from('delivery_addresses')
-    .insert(address)
-    .select()
-    .single();
+    .insert(address);
   if (error) throw error;
-  return data;
 }
 
 // ─── Update delivery address ─────────────────────────────
