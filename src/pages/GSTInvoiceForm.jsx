@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/common/Toast';
 import { fetchGSTInvoice, createGSTInvoice, updateGSTInvoice } from '../lib/gstInvoices';
+import { fetchCompany } from '../lib/companies';
 import { amtWordsIndian } from '../lib/numberToWords';
 import { writeAuditLog } from '../lib/auditLog';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -20,8 +21,24 @@ const EMPTY_LINE = {
   discount: 0,
 };
 
-const fmt = (v) =>
-  (parseFloat(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// ASCII-safe formatter for jsPDF — locale formatters emit Unicode thin-spaces
+// that jsPDF renders as stretched gaps. Use manual Indian grouping instead.
+const fmt = (v) => {
+  const n = parseFloat(v) || 0;
+  const [intPart, decPart] = n.toFixed(2).split('.');
+  const s = intPart.replace(/^-/, '');
+  const neg = n < 0 ? '-' : '';
+  let result = '';
+  if (s.length > 3) {
+    result = s.slice(-3);
+    let rem = s.slice(0, -3);
+    while (rem.length > 2) { result = rem.slice(-2) + ',' + result; rem = rem.slice(0, -2); }
+    result = rem + ',' + result;
+  } else {
+    result = s;
+  }
+  return neg + result + '.' + decPart;
+};
 
 // ─── PDF Generator ────────────────────────────────────────────────────────────
 function generateGSTInvoicePDF(inv) {
@@ -41,8 +58,11 @@ function generateGSTInvoicePDF(inv) {
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   y += 5;
-  doc.text(inv.lessorAddress, L, y);
-  y += 4;
+  if (inv.lessorAddress) {
+    const addrWrapped = doc.splitTextToSize(inv.lessorAddress, 120);
+    doc.text(addrWrapped, L, y);
+    y += addrWrapped.length * 4;
+  }
   doc.text(`GSTIN/UIN: ${inv.lessorGSTIN}   State: ${inv.lessorState}   Code: ${inv.lessorStateCode}`, L, y);
 
   doc.setFontSize(8);
@@ -212,15 +232,22 @@ function generateGSTInvoicePDF(inv) {
   doc.text('Tax Summary:', 120, y);
   doc.setFont('helvetica', 'normal');
   y += 4;
-  doc.text(`Total Before Tax: ₹${fmt(totalTaxable)}`, 120, y); y += 4;
+  // Label left-aligned at 120, value right-aligned at R
+  const taxRow = (label, amount) => {
+    doc.text(label, 120, y);
+    doc.text('Rs.' + fmt(amount), R, y, { align: 'right' });
+    y += 4;
+  };
+  taxRow('Total Before Tax:', totalTaxable);
   if (isSameState) {
-    doc.text(`CGST @ ${HALF}%: ₹${fmt(totalCGST)}`, 120, y); y += 4;
-    doc.text(`SGST @ ${HALF}%: ₹${fmt(totalSGST)}`, 120, y); y += 4;
+    taxRow(`CGST @ ${HALF}%:`, totalCGST);
+    taxRow(`SGST @ ${HALF}%:`, totalSGST);
   } else {
-    doc.text(`IGST @ ${GST_RATE}%: ₹${fmt(totalIGST)}`, 120, y); y += 4;
+    taxRow(`IGST @ ${GST_RATE}%:`, totalIGST);
   }
   doc.setFont('helvetica', 'bold');
-  doc.text(`Total After Tax: ₹${fmt(grandTotal)}`, 120, y);
+  doc.text('Total After Tax:', 120, y);
+  doc.text('Rs.' + fmt(grandTotal), R, y, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   y += 4;
   doc.text('GST Payable under RCM: No', 120, y);
@@ -307,16 +334,27 @@ export default function GSTInvoiceForm() {
     'Payment due within 30 days of invoice date.\nLate payment subject to 18% per annum interest.'
   );
 
-  // Pre-fill lessor from activeCompany
+  // Pre-fill lessor from activeCompany — fetch full record to get address
   useEffect(() => {
-    if (!activeCompany) return;
-    setLessorName(activeCompany.name || '');
-    setLessorAddress(activeCompany.address_line1 || '');
-    setLessorGSTIN(activeCompany.gstin || '');
-    // RFPL is Tamil Nadu (33), RHHF is Kerala (32)
-    const isRFPL = activeCompany.short_name === 'RFPL' || (activeCompany.gstin || '').startsWith('33');
-    setLessorState(isRFPL ? 'Tamil Nadu' : 'Kerala');
-    setLessorStateCode(isRFPL ? '33' : '32');
+    if (!activeCompany?.id) return;
+    fetchCompany(activeCompany.id)
+      .then((co) => {
+        setLessorName(co.name || '');
+        const addr = [co.address_line1, co.city, co.state, co.pincode].filter(Boolean).join(', ');
+        setLessorAddress(addr || co.address_line1 || '');
+        setLessorGSTIN(co.gstin || '');
+        const isRFPL = co.short_name === 'RFPL' || (co.gstin || '').startsWith('33');
+        setLessorState(isRFPL ? 'Tamil Nadu' : 'Kerala');
+        setLessorStateCode(isRFPL ? '33' : '32');
+      })
+      .catch(() => {
+        // fallback to activeCompany minimal fields
+        setLessorName(activeCompany.name || '');
+        setLessorGSTIN(activeCompany.gstin || '');
+        const isRFPL = activeCompany.short_name === 'RFPL' || (activeCompany.gstin || '').startsWith('33');
+        setLessorState(isRFPL ? 'Tamil Nadu' : 'Kerala');
+        setLessorStateCode(isRFPL ? '33' : '32');
+      });
   }, [activeCompany]);
 
   // Load existing invoice for edit
