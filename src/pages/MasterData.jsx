@@ -329,7 +329,7 @@ export default function MasterData() {
         {tab === 'products' && (
           <>
             <div className="md-content__header"><h2>Products</h2><p className="text-muted">{activeCompany?.short_name}</p></div>
-            {renderFilterBar('Search products…', '+ Add Product', () => openNew('New Product', { is_active: true, unit: 'MT' }))}
+            {renderFilterBar('Search products…', '+ Add Product', () => openNew('New Product', { is_active: true, default_unit: 'MT' }))}
             {loading ? <LoadingSpinner /> : renderTable(
               [
                 { key: 'name', label: 'Product Name' },
