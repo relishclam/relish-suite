@@ -41,27 +41,11 @@ When the table is found, check for:
 
 ### 1.3 If no shell output table exists yet
 
-ClamFlow needs to **add** one. Recommended schema:
+This is a question for the **ClamFlow development team** to answer and implement within ClamFlow's own codebase.
 
-```sql
-CREATE TABLE clamflow.production_batches (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  lot_id          UUID REFERENCES clamflow.lots(id),
-  batch_date      DATE NOT NULL,
-  clam_in_kg      NUMERIC(15,3),   -- input weight
-  meat_yield_kg   NUMERIC(15,3),   -- clam meat extracted
-  shell_yield_kg  NUMERIC(15,3),   -- shell by-product (this is what CalciWorks needs)
-  waste_kg        NUMERIC(15,3),
-  shift_id        UUID,
-  notes           TEXT,
-  created_at      TIMESTAMPTZ DEFAULT now()
-);
-```
+Suite will NOT create any tables in ClamFlow. Suite will NOT write to ClamFlow.
 
-Once this exists:
-- Suite's `clamflow.js` will add `fetchShellProduction(fromDate, toDate)`
-- CalciWorks will have a **"Sync from ClamFlow"** button that pulls unimported batches
-- Synced batches create `suite.shell_stock` entries with `entry_type = 'receipt'`
+Once ClamFlow has a production batch / yield table that includes shell output weight, Suite will read from it (SELECT only) to sync receipts into `suite.shell_stock`.
 
 ### 1.4 Currently Safe Columns Registered in Suite
 
