@@ -48,6 +48,13 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION pramaana.fn_prevent_posted_edit()
 RETURNS TRIGGER AS $$
 BEGIN
+  IF TG_OP = 'DELETE' THEN
+    IF OLD.status IN ('posted', 'cancelled') THEN
+      RAISE EXCEPTION 'Cannot delete a % voucher. Number: %', OLD.status, OLD.voucher_number;
+    END IF;
+    RETURN OLD;
+  END IF;
+  -- UPDATE path
   IF OLD.status IN ('posted', 'cancelled') THEN
     RAISE EXCEPTION 'Cannot modify a % voucher. Number: %', OLD.status, OLD.voucher_number;
   END IF;
