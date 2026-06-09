@@ -6,3 +6,7 @@ dist/
 *.log
 .DS_Store
 generate-icons.mjs
+
+# pramaana is a separate git repo
+pramaana/
+
