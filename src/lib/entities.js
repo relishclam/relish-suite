@@ -34,7 +34,7 @@ export async function fetchEntities(companyId, { search = '', activeOnly = true 
         id, type, display_name, alias,
         mobile, email, gstin, pan,
         address_line1, address_line2, city, state, pincode, country,
-        bank_name, bank_account_holder, bank_account_number, bank_ifsc, upi_id,
+        bank_name, bank_account_holder, bank_account_number, bank_ifsc, bank_swift, upi_id,
         is_active
       )
     `)
@@ -88,6 +88,7 @@ export async function createEntity(companyId, data, userId) {
       bank_account_holder:  data.bank_account_holder ?? null,
       bank_account_number:  data.bank_account_number ?? null,
       bank_ifsc:            data.bank_ifsc ?? null,
+      bank_swift:           data.bank_swift ?? null,
       upi_id:               data.upi_id ?? null,
       is_active:            true,
       source_app:           'suite',
@@ -135,6 +136,7 @@ export async function updateEntity(entityId, roleId, data) {
     bank_account_holder: data.bank_account_holder ?? null,
     bank_account_number: data.bank_account_number ?? null,
     bank_ifsc:           data.bank_ifsc ?? null,
+    bank_swift:          data.bank_swift ?? null,
     upi_id:              data.upi_id ?? null,
   };
   Object.keys(entityUpdate).forEach((k) => {

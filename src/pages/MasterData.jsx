@@ -696,8 +696,13 @@ export default function MasterData() {
               {inp('Country', 'country', { placeholder: 'India' })}
               {form.role !== 'Customer' && inp('Bank Name', 'bank_name')}
               {form.role !== 'Customer' && inp('Account Holder', 'bank_account_holder')}
-              {form.role !== 'Customer' && inp('Account Number', 'bank_account_number')}
-              {form.role !== 'Customer' && inp('IFSC Code', 'bank_ifsc')}
+              {form.role !== 'Customer' && inp(
+                form.country && form.country !== 'India' ? 'Account / IBAN' : 'Account Number',
+                'bank_account_number'
+              )}
+              {form.role !== 'Customer' && form.country && form.country !== 'India'
+                ? inp('SWIFT / BIC Code', 'bank_swift', { placeholder: 'e.g. HSBCHKHHHKH' })
+                : form.role !== 'Customer' && inp('IFSC Code', 'bank_ifsc', { placeholder: 'e.g. SBIN0001234' })}
               {inp('UPI ID', 'upi_id')}
               {['Vendor', 'Customer'].includes(form.role) && inp('Tally Ledger Name', 'tally_ledger')}
               {['Staff', 'Management'].includes(form.role) && inp('Designation', 'designation')}
