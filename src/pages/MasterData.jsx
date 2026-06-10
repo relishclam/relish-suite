@@ -691,8 +691,8 @@ export default function MasterData() {
               {/* India: GSTIN + PAN. Overseas: local company reg + tax/VAT reg */}
               {form.country && form.country !== 'India' ? (
                 <>
-                  {inp('Company Reg. No.', 'local_reg_number', { placeholder: 'BRC / UEN / CRN / CR No.' })}
-                  {inp('Tax / VAT Reg. No.', 'local_tax_number', { placeholder: 'VAT / GST Reg. No.' })}
+                  {inp('Company Reg. No.', 'local_reg_number', { placeholder: 'BRC (HK) · UEN (SG) · USCC (CN) · Corporate No. (JP) · CR No. (UAE/TH)' })}
+                  {inp('Tax / VAT / GST Reg. No.', 'local_tax_number', { placeholder: 'VAT / TRN / TIN — leave blank if same as reg. no. (CN/JP)' })}
                 </>
               ) : (
                 <>
