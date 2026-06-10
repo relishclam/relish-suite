@@ -117,10 +117,12 @@ export default function MasterData() {
     } else if (tab === 'entities') {
       setForm({
         ...record.entity,
-        role:         record.role,
-        tally_ledger: record.tally_ledger,
-        designation:  record.designation,
-        department:   record.department,
+        role:             record.role,
+        tally_ledger:     record.tally_ledger,
+        designation:      record.designation,
+        department:       record.department,
+        local_reg_number: record.entity?.local_reg_number,
+        local_tax_number: record.entity?.local_tax_number,
       });
       setEntityRoles([]);
       setAddRoleMode(false);
@@ -403,7 +405,7 @@ export default function MasterData() {
                 { key: 'display_name', label: 'Name', render: (r) => r.entity?.display_name || '—' },
                 { key: 'role', label: 'Role', render: (r) => <span className="badge badge--info">{r.role}</span> },
                 { key: 'mobile', label: 'Mobile', render: (r) => r.entity?.mobile || '—' },
-                { key: 'gstin_or_desig', label: 'GSTIN / Designation', render: (r) => r.entity?.gstin || r.designation || '—' },
+                { key: 'gstin_or_desig', label: 'Reg. No. / Designation', render: (r) => r.entity?.gstin || r.entity?.local_reg_number || r.designation || '—' },
                 { key: 'is_active', label: 'Status', render: (r) => <span className={`badge badge--${r.is_active ? 'success' : 'muted'}`}>{r.is_active ? 'Active' : 'Inactive'}</span> },
               ],
               entities,
@@ -686,8 +688,18 @@ export default function MasterData() {
               {inp('Alias / Short Name', 'alias')}
               {inp('Mobile', 'mobile', { type: 'tel' })}
               {inp('Email', 'email', { type: 'email' })}
-              {['Vendor', 'Customer', 'Supplier', 'Government'].includes(form.role) && inp('GSTIN', 'gstin')}
-              {inp('PAN', 'pan')}
+              {/* India: GSTIN + PAN. Overseas: local company reg + tax/VAT reg */}
+              {form.country && form.country !== 'India' ? (
+                <>
+                  {inp('Company Reg. No.', 'local_reg_number', { placeholder: 'BRC / UEN / CRN / CR No.' })}
+                  {inp('Tax / VAT Reg. No.', 'local_tax_number', { placeholder: 'VAT / GST Reg. No.' })}
+                </>
+              ) : (
+                <>
+                  {['Vendor', 'Customer', 'Supplier', 'Government'].includes(form.role) && inp('GSTIN', 'gstin')}
+                  {inp('PAN', 'pan')}
+                </>
+              )}
               {inp('Address Line 1', 'address_line1', { span2: true })}
               {inp('Address Line 2', 'address_line2', { span2: true })}
               {inp('City', 'city')}
@@ -704,7 +716,7 @@ export default function MasterData() {
                 ? inp('SWIFT / BIC Code', 'bank_swift', { placeholder: 'e.g. HSBCHKHHHKH' })
                 : form.role !== 'Customer' && inp('IFSC Code', 'bank_ifsc', { placeholder: 'e.g. SBIN0001234' })}
               {inp('UPI ID', 'upi_id')}
-              {['Vendor', 'Customer'].includes(form.role) && inp('Tally Ledger Name', 'tally_ledger')}
+              {['Vendor', 'Customer'].includes(form.role) && inp('Pramaana Ledger Name', 'tally_ledger', { placeholder: 'e.g. FoodStream Ltd. — HK' })}
               {['Staff', 'Management'].includes(form.role) && inp('Designation', 'designation')}
               {['Staff', 'Management'].includes(form.role) && inp('Department', 'department')}
             </div>

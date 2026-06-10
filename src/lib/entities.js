@@ -32,7 +32,7 @@ export async function fetchEntities(companyId, { search = '', activeOnly = true 
       is_active,
       entity:entities(
         id, type, display_name, alias,
-        mobile, email, gstin, pan,
+        mobile, email, gstin, pan, local_reg_number, local_tax_number,
         address_line1, address_line2, city, state, pincode, country,
         bank_name, bank_account_holder, bank_account_number, bank_ifsc, bank_swift, upi_id,
         is_active
@@ -78,6 +78,8 @@ export async function createEntity(companyId, data, userId) {
       email:                data.email ?? null,
       gstin:                data.gstin ?? null,
       pan:                  data.pan ?? null,
+      local_reg_number:     data.local_reg_number ?? null,
+      local_tax_number:     data.local_tax_number ?? null,
       address_line1:        data.address_line1 ?? null,
       address_line2:        data.address_line2 ?? null,
       city:                 data.city ?? null,
@@ -126,6 +128,8 @@ export async function updateEntity(entityId, roleId, data) {
     email:               data.email ?? null,
     gstin:               data.gstin ?? null,
     pan:                 data.pan ?? null,
+    local_reg_number:    data.local_reg_number ?? null,
+    local_tax_number:    data.local_tax_number ?? null,
     address_line1:       data.address_line1 ?? null,
     address_line2:       data.address_line2 ?? null,
     city:                data.city ?? null,
