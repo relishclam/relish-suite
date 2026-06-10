@@ -8,6 +8,7 @@ import { fetchVendors, createVendor, updateVendor, toggleVendorActive } from '..
 import { fetchBuyers, createBuyer, updateBuyer, toggleBuyerActive } from '../lib/buyers';
 import { fetchProducts, createProduct, updateProduct, toggleProductActive } from '../lib/products';
 import { fetchDeliveryAddresses, createDeliveryAddress, updateDeliveryAddress, toggleDeliveryAddressActive } from '../lib/deliveryAddresses';
+import { fetchEntities, createEntity, updateEntity, toggleEntityActive, ENTITY_ROLES } from '../lib/entities';
 import { fetchTallyConfig, upsertTallyConfig } from '../lib/tallyConfig';
 import { fetchClamFlowSuppliers, fetchClamFlowSupplier, fetchOnboardingStatus, fetchSupplierLots, fetchSupplierLotSummary, fetchClamFlowStaff, maskAadhaar } from '../lib/clamflow';
 import { writeAuditLog } from '../lib/auditLog';
@@ -18,6 +19,7 @@ const TABS = [
   { key: 'buyers', label: 'Buyers', icon: '🛒' },
   { key: 'products', label: 'Products', icon: '🏷️' },
   { key: 'delivery', label: 'Delivery Addresses', icon: '📍' },
+  { key: 'entities', label: 'Entities', icon: '👥' },
   { key: 'tally', label: 'Tally Config', icon: '⚙️' },
   { key: 'clamflow', label: 'ClamFlow Suppliers', icon: '🦪', requiresClamFlow: true },
   { key: 'personnel', label: 'Personnel', icon: '👷', requiresClamFlow: true },
@@ -48,6 +50,7 @@ export default function MasterData() {
   const [tallyConf, setTallyConf] = useState(null);
   const [cfSuppliers, setCfSuppliers] = useState([]);
   const [cfStaff, setCfStaff] = useState([]);
+  const [entities, setEntities] = useState([]);
 
   // ClamFlow supplier detail slide-over
   const [cfDetail, setCfDetail] = useState(null);
@@ -78,6 +81,7 @@ export default function MasterData() {
         case 'products': setProducts(await fetchProducts(activeCompany.id, { search, activeOnly: !showInactive })); break;
         case 'delivery': setAddresses(await fetchDeliveryAddresses(activeCompany.id)); break;
         case 'tally': setTallyConf(await fetchTallyConfig(activeCompany.id)); break;
+        case 'entities': setEntities(await fetchEntities(activeCompany.id, { search, activeOnly: !showInactive })); break;
         case 'clamflow': setCfSuppliers(await fetchClamFlowSuppliers({ search }).catch(() => [])); break;
         case 'personnel': setCfStaff(await fetchClamFlowStaff({ search }).catch(() => [])); break;
       }
@@ -105,6 +109,14 @@ export default function MasterData() {
       setForm({ ...record.entity, vendor_code: record.entity?.alias });
     } else if (tab === 'buyers') {
       setForm({ ...record.entity });
+    } else if (tab === 'entities') {
+      setForm({
+        ...record.entity,
+        role:         record.role,
+        tally_ledger: record.tally_ledger,
+        designation:  record.designation,
+        department:   record.department,
+      });
     } else {
       setForm({ ...record });
     }
@@ -366,6 +378,25 @@ export default function MasterData() {
           </>
         )}
 
+        {/* ═══ ENTITIES ═══ */}
+        {tab === 'entities' && (
+          <>
+            <div className="md-content__header"><h2>Entities</h2><p className="text-muted">{activeCompany?.short_name}</p></div>
+            {renderFilterBar('Search entities…', '+ Add Entity', () => openNew('New Entity', { role: 'Vendor' }))}
+            {loading ? <LoadingSpinner /> : renderTable(
+              [
+                { key: 'display_name', label: 'Name', render: (r) => r.entity?.display_name || '—' },
+                { key: 'role', label: 'Role', render: (r) => <span className="badge badge--info">{r.role}</span> },
+                { key: 'mobile', label: 'Mobile', render: (r) => r.entity?.mobile || '—' },
+                { key: 'gstin_or_desig', label: 'GSTIN / Designation', render: (r) => r.entity?.gstin || r.designation || '—' },
+                { key: 'is_active', label: 'Status', render: (r) => <span className={`badge badge--${r.is_active ? 'success' : 'muted'}`}>{r.is_active ? 'Active' : 'Inactive'}</span> },
+              ],
+              entities,
+              canEdit ? (r) => openEdit('Edit Entity', r) : undefined
+            )}
+          </>
+        )}
+
         {/* ═══ TALLY CONFIG ═══ */}
         {tab === 'tally' && (
           <>
@@ -607,6 +638,61 @@ export default function MasterData() {
               <button type="button" className="btn" onClick={closeSlide}>Cancel</button>
               {editing && (
                 <button type="button" className={`btn btn-sm ${editing.is_active ? 'btn-danger-outline' : ''}`} style={{ marginLeft: 'auto' }} onClick={() => { handleToggle(toggleDeliveryAddressActive, editing.id, !editing.is_active, 'delivery_addresses'); closeSlide(); }}>
+                  {editing.is_active ? 'Deactivate' : 'Activate'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ─── Entity form ─── */}
+        {slideOpen && tab === 'entities' && !cfDetail && (
+          <div className="md-slide-form">
+            <div className="po-form__grid">
+              {editing
+                ? inp('Role', 'role', { readOnly: true })
+                : inp('Role *', 'role', { select: true, options: [{ value: '', label: '— Select Role —' }, ...ENTITY_ROLES.map((r) => ({ value: r, label: r }))] })}
+              {inp('Display Name *', 'display_name')}
+              {inp('Alias / Short Name', 'alias')}
+              {inp('Mobile', 'mobile', { type: 'tel' })}
+              {inp('Email', 'email', { type: 'email' })}
+              {['Vendor', 'Customer', 'Supplier', 'Government'].includes(form.role) && inp('GSTIN', 'gstin')}
+              {inp('PAN', 'pan')}
+              {inp('Address Line 1', 'address_line1', { span2: true })}
+              {inp('Address Line 2', 'address_line2', { span2: true })}
+              {inp('City', 'city')}
+              {inp('State', 'state')}
+              {inp('Pincode', 'pincode')}
+              {inp('Country', 'country', { placeholder: 'India' })}
+              {form.role !== 'Customer' && inp('Bank Name', 'bank_name')}
+              {form.role !== 'Customer' && inp('Account Holder', 'bank_account_holder')}
+              {form.role !== 'Customer' && inp('Account Number', 'bank_account_number')}
+              {form.role !== 'Customer' && inp('IFSC Code', 'bank_ifsc')}
+              {inp('UPI ID', 'upi_id')}
+              {['Vendor', 'Customer'].includes(form.role) && inp('Tally Ledger Name', 'tally_ledger')}
+              {['Staff', 'Management'].includes(form.role) && inp('Designation', 'designation')}
+              {['Staff', 'Management'].includes(form.role) && inp('Department', 'department')}
+            </div>
+            <div className="md-slide-form__actions">
+              <button type="button" className="btn btn-primary" disabled={saving} onClick={async () => {
+                setSaving(true);
+                try {
+                  if (editing) {
+                    await updateEntity(editing.entity.id, editing.id, form);
+                    writeAuditLog({ companyId: activeCompany?.id, action: 'update', tableName: 'registry.entities', recordId: editing.entity.id });
+                  } else {
+                    const result = await createEntity(activeCompany.id, form, user?.id);
+                    writeAuditLog({ companyId: activeCompany?.id, action: 'create', tableName: 'registry.entities', recordId: result.entity.id });
+                  }
+                  addToast(editing ? 'Updated successfully' : 'Created successfully', 'success');
+                  closeSlide();
+                  loadTab();
+                } catch (err) { addToast('Save failed: ' + err.message, 'error'); }
+                finally { setSaving(false); }
+              }}>{saving ? 'Saving…' : editing ? 'Update' : 'Create'}</button>
+              <button type="button" className="btn" onClick={closeSlide}>Cancel</button>
+              {editing && (
+                <button type="button" className={`btn btn-sm ${editing.is_active ? 'btn-danger-outline' : ''}`} style={{ marginLeft: 'auto' }} onClick={() => { handleToggle(toggleEntityActive, editing.id, !editing.is_active, 'entity_roles'); closeSlide(); }}>
                   {editing.is_active ? 'Deactivate' : 'Activate'}
                 </button>
               )}
