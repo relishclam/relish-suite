@@ -172,3 +172,72 @@ export async function toggleEntityActive(roleId, isActive) {
     .eq('id', roleId);
   if (error) throw error;
 }
+
+// ─── Search for potential duplicate entities ──────────────────────────────────
+// Checks GSTIN first (strongest signal), then mobile, then display_name.
+// Foreign companies (e.g. Hong Kong) have no GSTIN — mobile/name check applies.
+// Returns up to 5 matching entity rows.
+export async function searchDuplicateEntity({ gstin, mobile, display_name }) {
+  if (gstin) {
+    const { data } = await supabase
+      .schema('registry')
+      .from('entities')
+      .select('id, type, display_name, mobile, gstin, city, country')
+      .eq('gstin', gstin)
+      .limit(5);
+    if (data?.length) return data;
+  }
+  if (mobile) {
+    const { data } = await supabase
+      .schema('registry')
+      .from('entities')
+      .select('id, type, display_name, mobile, gstin, city, country')
+      .eq('mobile', mobile)
+      .limit(5);
+    if (data?.length) return data;
+  }
+  if (display_name && display_name.trim().length >= 3) {
+    const { data } = await supabase
+      .schema('registry')
+      .from('entities')
+      .select('id, type, display_name, mobile, gstin, city, country')
+      .ilike('display_name', `%${display_name.trim()}%`)
+      .limit(5);
+    if (data?.length) return data;
+  }
+  return [];
+}
+
+// ─── Add a new role to an existing entity (no new entity row) ────────────────
+// Use when an entity like "FoodStream Ltd." needs to be both Vendor AND Customer.
+export async function addRoleToEntity(entityId, companyId, data) {
+  const roleId = crypto.randomUUID();
+  const { error } = await supabase
+    .schema('registry')
+    .from('entity_roles')
+    .insert({
+      id:           roleId,
+      entity_id:    entityId,
+      company_id:   companyId,
+      role:         data.role,
+      tally_ledger: data.tally_ledger ?? null,
+      designation:  data.designation ?? null,
+      department:   data.department ?? null,
+      is_active:    true,
+    });
+  if (error) throw error;
+  return { id: roleId };
+}
+
+// ─── Fetch all roles for an entity within a company ───────────────────────────
+export async function fetchEntityRoles(entityId, companyId) {
+  const { data, error } = await supabase
+    .schema('registry')
+    .from('entity_roles')
+    .select('id, role, tally_ledger, designation, department, is_active')
+    .eq('entity_id', entityId)
+    .eq('company_id', companyId)
+    .order('role');
+  if (error) throw error;
+  return data || [];
+}

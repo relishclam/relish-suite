@@ -8,7 +8,7 @@ import { fetchVendors, createVendor, updateVendor, toggleVendorActive } from '..
 import { fetchBuyers, createBuyer, updateBuyer, toggleBuyerActive } from '../lib/buyers';
 import { fetchProducts, createProduct, updateProduct, toggleProductActive } from '../lib/products';
 import { fetchDeliveryAddresses, createDeliveryAddress, updateDeliveryAddress, toggleDeliveryAddressActive } from '../lib/deliveryAddresses';
-import { fetchEntities, createEntity, updateEntity, toggleEntityActive, ENTITY_ROLES } from '../lib/entities';
+import { fetchEntities, createEntity, updateEntity, toggleEntityActive, ENTITY_ROLES, searchDuplicateEntity, addRoleToEntity, fetchEntityRoles } from '../lib/entities';
 import { fetchTallyConfig, upsertTallyConfig } from '../lib/tallyConfig';
 import { fetchClamFlowSuppliers, fetchClamFlowSupplier, fetchOnboardingStatus, fetchSupplierLots, fetchSupplierLotSummary, fetchClamFlowStaff, maskAadhaar } from '../lib/clamflow';
 import { writeAuditLog } from '../lib/auditLog';
@@ -51,6 +51,11 @@ export default function MasterData() {
   const [cfSuppliers, setCfSuppliers] = useState([]);
   const [cfStaff, setCfStaff] = useState([]);
   const [entities, setEntities] = useState([]);
+  const [dupMatches, setDupMatches] = useState([]);
+  const [showDupWarning, setShowDupWarning] = useState(false);
+  const [entityRoles, setEntityRoles] = useState([]);
+  const [addRoleMode, setAddRoleMode] = useState(false);
+  const [addRoleForm, setAddRoleForm] = useState({});
 
   // ClamFlow supplier detail slide-over
   const [cfDetail, setCfDetail] = useState(null);
@@ -117,6 +122,12 @@ export default function MasterData() {
         designation:  record.designation,
         department:   record.department,
       });
+      setEntityRoles([]);
+      setAddRoleMode(false);
+      setAddRoleForm({});
+      setDupMatches([]);
+      setShowDupWarning(false);
+      fetchEntityRoles(record.entity.id, activeCompany.id).then(setEntityRoles).catch(() => {});
     } else {
       setForm({ ...record });
     }
@@ -124,7 +135,11 @@ export default function MasterData() {
     setSlideOpen(true);
   };
 
-  const closeSlide = () => { setSlideOpen(false); setEditing(null); setForm({}); setCfDetail(null); };
+  const closeSlide = () => {
+    setSlideOpen(false); setEditing(null); setForm({}); setCfDetail(null);
+    setDupMatches([]); setShowDupWarning(false); setEntityRoles([]);
+    setAddRoleMode(false); setAddRoleForm({});
+  };
 
   // ── ClamFlow supplier detail ──
   const openCfSupplier = async (supplier) => {
@@ -648,6 +663,21 @@ export default function MasterData() {
         {/* ─── Entity form ─── */}
         {slideOpen && tab === 'entities' && !cfDetail && (
           <div className="md-slide-form">
+
+            {/* ── Other roles banner (edit mode, multi-role entity) ── */}
+            {editing && entityRoles.length > 1 && (
+              <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'var(--bg)', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
+                <div className="form-label" style={{ marginBottom: '0.4rem' }}>All roles for this entity</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  {entityRoles.map((r) => (
+                    <span key={r.id} className={`badge badge--${r.is_active ? 'info' : 'muted'}`}>
+                      {r.role}{!r.is_active ? ' (inactive)' : ''}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="po-form__grid">
               {editing
                 ? inp('Role', 'role', { readOnly: true })
@@ -673,26 +703,140 @@ export default function MasterData() {
               {['Staff', 'Management'].includes(form.role) && inp('Designation', 'designation')}
               {['Staff', 'Management'].includes(form.role) && inp('Department', 'department')}
             </div>
+
+            {/* ── Duplicate warning (shown after dup check on create) ── */}
+            {showDupWarning && (
+              <div style={{ margin: '1rem 0', padding: '1rem', background: '#fdf3e1', border: '1px solid #ef9f27', borderRadius: '0.5rem' }}>
+                <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: 'var(--warning)' }}>⚠ Possible duplicate detected</div>
+                {dupMatches.map((m) => (
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid #ef9f2740' }}>
+                    <div>
+                      <strong>{m.display_name}</strong>
+                      <span className="text-muted" style={{ marginLeft: '0.5rem', fontSize: '0.8rem' }}>
+                        {m.gstin || m.mobile || (m.city ? `${m.city}, ${m.country || ''}` : m.country || '')}
+                      </span>
+                    </div>
+                    <button type="button" className="btn btn-sm" style={{ marginLeft: '0.75rem', whiteSpace: 'nowrap' }}
+                      disabled={saving}
+                      onClick={async () => {
+                        setSaving(true);
+                        try {
+                          const result = await addRoleToEntity(m.id, activeCompany.id, {
+                            role: form.role, tally_ledger: form.tally_ledger,
+                            designation: form.designation, department: form.department,
+                          });
+                          writeAuditLog({ companyId: activeCompany?.id, action: 'create', tableName: 'registry.entity_roles', recordId: result.id });
+                          addToast(`${form.role} role added to ${m.display_name}`, 'success');
+                          closeSlide(); loadTab();
+                        } catch (err) { addToast('Failed: ' + err.message, 'error'); }
+                        finally { setSaving(false); }
+                      }}>+ Add {form.role} role to this</button>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                  <button type="button" className="btn btn-sm btn-primary" disabled={saving}
+                    onClick={async () => {
+                      setSaving(true);
+                      try {
+                        const result = await createEntity(activeCompany.id, form, user?.id);
+                        writeAuditLog({ companyId: activeCompany?.id, action: 'create', tableName: 'registry.entities', recordId: result.entity.id });
+                        addToast('Created as new entity', 'success');
+                        closeSlide(); loadTab();
+                      } catch (err) { addToast('Save failed: ' + err.message, 'error'); }
+                      finally { setSaving(false); }
+                    }}>Create as new entity anyway</button>
+                  <button type="button" className="btn btn-sm" onClick={() => setShowDupWarning(false)}>Back to form</button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Add another role panel (edit mode) ── */}
+            {editing && addRoleMode && (
+              <div style={{ margin: '1rem 0', padding: '1rem', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '0.5rem' }}>
+                <div className="form-label" style={{ marginBottom: '0.75rem', fontWeight: 600 }}>Add another role</div>
+                <div className="po-form__grid">
+                  <div className="form-group">
+                    <label className="form-label">Role *</label>
+                    <select className="form-input" value={addRoleForm.role || ''} onChange={(e) => setAddRoleForm((p) => ({ ...p, role: e.target.value }))}>
+                      <option value="">— Select Role —</option>
+                      {ENTITY_ROLES.filter((r) => !entityRoles.some((er) => er.role === r)).map((r) => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {['Vendor', 'Customer'].includes(addRoleForm.role) && (
+                    <div className="form-group">
+                      <label className="form-label">Tally Ledger Name</label>
+                      <input className="form-input" value={addRoleForm.tally_ledger || ''} onChange={(e) => setAddRoleForm((p) => ({ ...p, tally_ledger: e.target.value }))} />
+                    </div>
+                  )}
+                  {['Staff', 'Management'].includes(addRoleForm.role) && (
+                    <div className="form-group">
+                      <label className="form-label">Designation</label>
+                      <input className="form-input" value={addRoleForm.designation || ''} onChange={(e) => setAddRoleForm((p) => ({ ...p, designation: e.target.value }))} />
+                    </div>
+                  )}
+                  {['Staff', 'Management'].includes(addRoleForm.role) && (
+                    <div className="form-group">
+                      <label className="form-label">Department</label>
+                      <input className="form-input" value={addRoleForm.department || ''} onChange={(e) => setAddRoleForm((p) => ({ ...p, department: e.target.value }))} />
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button type="button" className="btn btn-sm btn-primary" disabled={saving || !addRoleForm.role}
+                    onClick={async () => {
+                      setSaving(true);
+                      try {
+                        const result = await addRoleToEntity(editing.entity.id, activeCompany.id, addRoleForm);
+                        writeAuditLog({ companyId: activeCompany?.id, action: 'create', tableName: 'registry.entity_roles', recordId: result.id });
+                        addToast(`${addRoleForm.role} role added`, 'success');
+                        const updated = await fetchEntityRoles(editing.entity.id, activeCompany.id);
+                        setEntityRoles(updated);
+                        setAddRoleMode(false); setAddRoleForm({});
+                        loadTab();
+                      } catch (err) { addToast('Failed: ' + err.message, 'error'); }
+                      finally { setSaving(false); }
+                    }}>{saving ? 'Saving…' : 'Add Role'}</button>
+                  <button type="button" className="btn btn-sm" onClick={() => { setAddRoleMode(false); setAddRoleForm({}); }}>Cancel</button>
+                </div>
+              </div>
+            )}
+
             <div className="md-slide-form__actions">
-              <button type="button" className="btn btn-primary" disabled={saving} onClick={async () => {
-                setSaving(true);
-                try {
-                  if (editing) {
-                    await updateEntity(editing.entity.id, editing.id, form);
-                    writeAuditLog({ companyId: activeCompany?.id, action: 'update', tableName: 'registry.entities', recordId: editing.entity.id });
-                  } else {
-                    const result = await createEntity(activeCompany.id, form, user?.id);
-                    writeAuditLog({ companyId: activeCompany?.id, action: 'create', tableName: 'registry.entities', recordId: result.entity.id });
-                  }
-                  addToast(editing ? 'Updated successfully' : 'Created successfully', 'success');
-                  closeSlide();
-                  loadTab();
-                } catch (err) { addToast('Save failed: ' + err.message, 'error'); }
-                finally { setSaving(false); }
-              }}>{saving ? 'Saving…' : editing ? 'Update' : 'Create'}</button>
+              {!showDupWarning && (
+                <button type="button" className="btn btn-primary" disabled={saving} onClick={async () => {
+                  setSaving(true);
+                  setDupMatches([]); setShowDupWarning(false);
+                  try {
+                    if (editing) {
+                      await updateEntity(editing.entity.id, editing.id, form);
+                      writeAuditLog({ companyId: activeCompany?.id, action: 'update', tableName: 'registry.entities', recordId: editing.entity.id });
+                      addToast('Updated successfully', 'success');
+                      closeSlide(); loadTab();
+                    } else {
+                      const dupes = await searchDuplicateEntity({ gstin: form.gstin, mobile: form.mobile, display_name: form.display_name });
+                      if (dupes.length > 0) {
+                        setDupMatches(dupes); setShowDupWarning(true);
+                        return;
+                      }
+                      const result = await createEntity(activeCompany.id, form, user?.id);
+                      writeAuditLog({ companyId: activeCompany?.id, action: 'create', tableName: 'registry.entities', recordId: result.entity.id });
+                      addToast('Created successfully', 'success');
+                      closeSlide(); loadTab();
+                    }
+                  } catch (err) { addToast('Save failed: ' + err.message, 'error'); }
+                  finally { setSaving(false); }
+                }}>{saving ? 'Saving…' : editing ? 'Update' : 'Check & Create'}</button>
+              )}
               <button type="button" className="btn" onClick={closeSlide}>Cancel</button>
+              {editing && !addRoleMode && ENTITY_ROLES.some((r) => !entityRoles.some((er) => er.role === r)) && (
+                <button type="button" className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setAddRoleMode(true)}>+ Add Role</button>
+              )}
               {editing && (
-                <button type="button" className={`btn btn-sm ${editing.is_active ? 'btn-danger-outline' : ''}`} style={{ marginLeft: 'auto' }} onClick={() => { handleToggle(toggleEntityActive, editing.id, !editing.is_active, 'entity_roles'); closeSlide(); }}>
+                <button type="button" className={`btn btn-sm ${editing.is_active ? 'btn-danger-outline' : ''}`}
+                  style={{ marginLeft: (addRoleMode || !ENTITY_ROLES.some((r) => !entityRoles.some((er) => er.role === r))) ? 'auto' : '0' }}
+                  onClick={() => { handleToggle(toggleEntityActive, editing.id, !editing.is_active, 'entity_roles'); closeSlide(); }}>
                   {editing.is_active ? 'Deactivate' : 'Activate'}
                 </button>
               )}
