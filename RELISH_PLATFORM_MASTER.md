@@ -177,7 +177,7 @@ supabase.schema('registry').rpc('next_fy_sequence', {
 | Commercial Invoices | `/invoices` | Export invoices with packing list |
 | GST Tax Invoice | `/gst-invoices` | RFPL factory lease to Peninsular Fisheries |
 | CalciWorks | `/calciworks` | Shell stock ledger (RHHF division) |
-| Master Data | `/master-data` | Vendors, Buyers, Products, Delivery Addresses |
+| Master Data | `/master-data` | Vendors, Buyers, Products, Delivery Addresses, **Entities** |
 | Tally Export | `/tally-export` | Reads Relish Approvals (READ ONLY), generates XML |
 | User Management | `/admin/users` | super_admin only |
 | Settings | `/settings` | Profile + company settings |
@@ -207,6 +207,7 @@ supabase.schema('registry').rpc('next_fy_sequence', {
 | `src/lib/invoices.js` | suite | suite.invoices + line items |
 | `src/lib/auditLog.js` | registry | registry.audit_log |
 | `src/lib/permissions.js` | — | Role → permission map (source of truth) |
+| `src/lib/entities.js` | registry | registry.entities + entity_roles — full CRUD, dup check, multi-role |
 
 ### 7.4 Suite Schema Query Pattern
 ```javascript
@@ -236,10 +237,33 @@ const entity = await supabase.schema('registry').from('entities')
 | 005_rls_and_grants.sql | ✅ Applied (patched) | Non-recursive RLS via is_super_admin() |
 | 006_rls_fixes.sql | ✅ Applied | Documents 4 dashboard fixes |
 | 007_calciworks_shell_stock.sql | ✅ Applied | shell_stock table + GST counter at 35 |
+| 010_entities_bank_swift.sql | ✅ Applied | ADD COLUMN bank_swift on registry.entities |
+| 011_entities_local_registration.sql | ✅ Applied | ADD COLUMN local_reg_number + local_tax_number on registry.entities |
+
+### 7.7 Entity Model — Implementation Notes (June 2026)
+
+**Multi-role entities:** A single `registry.entities` row can have multiple `entity_roles` rows (e.g. FoodStream Ltd. is both Vendor and Customer). The `UNIQUE(entity_id, company_id, role)` constraint prevents duplicate roles per company.
+
+**Duplicate check on create:** Before inserting, `searchDuplicateEntity()` in `entities.js` checks GSTIN → mobile → display_name (in priority order). If a match is found the UI presents an inline warning with an "Add [Role] to this" option — avoiding duplicate entity records.
+
+**Country-aware form fields:**
+
+| Country | Registration fields | Bank routing field |
+|---|---|---|
+| India (or blank) | GSTIN (role-conditional) + PAN | IFSC Code |
+| Any other | Company Reg. No. + Tax/VAT Reg. No. | SWIFT / BIC Code |
+
+Overseas registration formats (Company Reg. No.):
+- Hong Kong: BRC No. · Singapore: UEN · China: USCC (18-char) · Japan: Corporate No. (13-digit) · Thailand: CR No. · UAE: CR No. · UK: Companies House No.
+
+For China and Japan the tax number is the same as the company registration number — leave Tax/VAT Reg. blank.
+
+**Pramaana Ledger Name:** The `tally_ledger` column in `entity_roles` is displayed as "Pramaana Ledger Name" in the UI. It still powers Tally XML export during cut-over AND will be the Pramaana ledger reference post cut-over.
+
+**Pre-deployment reset:** `supabase/scripts/pre_deployment_data_reset.sql` — run once manually in Supabase SQL editor before functional go-live. Clears all test entities, vouchers, POs, sequences. Preserves companies, users, ledger_groups, voucher_types.
 
 ---
 
-## 8. Pramaana — Module Map
 
 ### 8.1 Modules Built ✅
 
@@ -550,7 +574,7 @@ Four KPI cards:
 Creates vendors, staff, customers in `registry.entities` + `registry.entity_roles`.  
 Pramaana payee typeahead will now return results once entities are seeded here.
 
-**Fields per entity type:**
+**Fields per entity type (India):**
 
 | Field | Vendor | Staff | Customer | Management |
 |-------|:------:|:-----:|:--------:|:----------:|
@@ -559,9 +583,19 @@ Pramaana payee typeahead will now return results once entities are seeded here.
 | GSTIN | ✅ Required | | ✅ | |
 | PAN | ✅ | ✅ | ✅ | ✅ |
 | Bank Details | ✅ Required | ✅ Required | ✅ Optional | ✅ Required |
+| IFSC | ✅ | ✅ | | ✅ |
 | UPI ID | ✅ | ✅ | ✅ | ✅ |
-| Tally Ledger Name | ✅ Required | | ✅ Required | |
+| Pramaana Ledger Name | ✅ Required | | ✅ Required | |
 | Designation | | ✅ | | ✅ Required |
+
+**Fields per entity type (Overseas — country ≠ India):**
+
+| Field | Replaces |
+|-------|----------|
+| Company Reg. No. | GSTIN |
+| Tax / VAT Reg. No. | PAN |
+| SWIFT / BIC Code | IFSC Code |
+| Account / IBAN | Account Number |
 
 ### 🔲 Phase 3 — Pramaana Financial Reports
 Trial Balance, Ledger Statement, Day Book, P&L, Balance Sheet
@@ -652,6 +686,11 @@ TWOFACTOR_API_KEY=<2Factor API key>
 | 2026-06-08 | relish-suite | `ea7f564` | Add Pramaana schema DDL (008) — 19 tables, triggers, RLS |
 | 2026-06-08 | relish-suite | `4ad605c` | feat: Screen 2 - Ledger Master complete with bank fields |
 | 2026-06-08 | relish-suite | `c218b3f` | chore: extract pramaana/ into standalone repo |
+| 2026-06-11 | relish-suite | `c9ccd3a` | feat(master-data): add Entities tab — registry.entities + entity_roles CRUD |
+| 2026-06-11 | relish-suite | `ffbfdf3` | feat(entities): duplicate detection + multi-role support |
+| 2026-06-11 | relish-suite | `426c12c` | feat(entities): SWIFT/BIC support — migration 010 |
+| 2026-06-11 | relish-suite | `adc72e6` | feat(entities): overseas reg fields, Pramaana ledger label, reset script — migrations 010+011 |
+| 2026-06-11 | relish-suite | `54a0c37` | chore(entities): expand overseas reg placeholder to include JP/CN/TH |
 | 2026-06-10 | pramaana | `63107bd` | fix: mobile sidebar overlay + PWA manifest with square icons |
 | 2026-06-10 | pramaana | `8b86ac0` | fix: remove is_active filter from entities query, fix deprecated PWA meta |
 | 2026-06-10 | pramaana | `75789a9` | fix: add icon.png to PWA manifest and apple-touch-icon |
