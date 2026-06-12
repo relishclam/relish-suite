@@ -1946,10 +1946,11 @@
 }
 .dash-card__app-logo {
   width: 100%;
-  max-width: 140px;
-  height: auto;
+  max-width: 180px;
+  height: 72px;
   object-fit: contain;
-  margin-bottom: 0.25rem;
+  object-position: center;
+  margin-bottom: 0.5rem;
 }
 .dash-tabs {
   display: grid;
