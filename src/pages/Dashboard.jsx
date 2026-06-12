@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import logoApprovals from '../assets/logo-approvals.png';
+import logoPramaana from '../assets/logo-pramaana.png';
 import logoClamFlow from '../assets/logo-clamflow.png';
 import logoDocs from '../assets/Docs_Logo.png';
 import logoSettings from '../assets/Settings_Logo.png';
@@ -34,10 +34,10 @@ const TABS = [
 // External app shortcuts — read-only links, no data written to these apps
 const EXTERNAL_APPS = [
   {
-    href: 'https://relishvoucher.vercel.app/',
-    label: 'Relish Approvals',
-    desc: 'Payment voucher approvals',
-    logo: logoApprovals,
+    href: 'https://pramaana-tau.vercel.app',
+    label: 'Pramaana',
+    desc: 'Vouchers, payments & accounts',
+    logo: logoPramaana,
     roles: ['super_admin', 'admin', 'accounts'],
   },
   {
