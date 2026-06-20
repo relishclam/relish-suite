@@ -162,8 +162,11 @@ export function AuthProvider({ children }) {
       setSession(next);
       setUser(next?.user ?? null);
       if (next?.user) {
-        setLoading(true);
-        fetchUserData(next.user.id).finally(() => { if (mounted) setLoading(false); });
+        // Do NOT set loading=true here — doing so unmounts the current page
+        // component (ProtectedRoute shows a spinner) and destroys all form
+        // state. Token refreshes (TOKEN_REFRESHED) fire every time the tab
+        // regains focus; user data can be refreshed silently in the background.
+        fetchUserData(next.user.id);
       } else {
         setProfile(null);
         setCompanyUsers([]);
