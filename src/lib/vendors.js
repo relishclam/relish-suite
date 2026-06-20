@@ -10,6 +10,7 @@ export async function fetchVendors(companyId) {
     .select(`
       id,
       role,
+      is_active,
       tally_ledger,
       entity:entities(
         id, display_name, alias, gstin, pan,
