@@ -541,6 +541,11 @@ export default function MasterData() {
               {inp('Postal Code', 'postal_code')}
               {inp('Country', 'country')}
               {inp('GSTIN / Tax ID', 'gstin')}
+              {inp('Bank Name', 'bank_name')}
+              {inp('Account Holder', 'bank_account_holder')}
+              {inp('Account Number', 'bank_account_number')}
+              {inp('IFSC Code', 'bank_ifsc', { placeholder: 'e.g. SBIN0001234' })}
+              {inp('UPI ID', 'upi_id')}
               {inp('Active', 'is_active', { toggle: true })}
             </div>
             <div className="md-slide-form__actions">

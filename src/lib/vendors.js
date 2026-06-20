@@ -59,7 +59,11 @@ export async function createVendor(companyId, vendorData) {
       city: vendorData.city ?? null,
       state: vendorData.state ?? null,
       pincode: vendorData.postal_code ?? null,
-      bank_name: vendorData.bank_details ?? null,
+      bank_name:           vendorData.bank_name ?? null,
+      bank_account_holder: vendorData.bank_account_holder ?? null,
+      bank_account_number: vendorData.bank_account_number ?? null,
+      bank_ifsc:           vendorData.bank_ifsc ?? null,
+      upi_id:              vendorData.upi_id ?? null,
       is_active: true,
       source_app: 'suite',
     });
@@ -94,7 +98,11 @@ export async function updateVendor(entityId, updates) {
     city:         updates.city,
     state:        updates.state,
     pincode:      updates.postal_code,
-    bank_name:    updates.bank_details,
+    bank_name:    updates.bank_name,
+    bank_account_holder:  updates.bank_account_holder,
+    bank_account_number:  updates.bank_account_number,
+    bank_ifsc:    updates.bank_ifsc,
+    upi_id:       updates.upi_id,
     is_active:    updates.is_active,
   };
   Object.keys(allowed).forEach((k) => allowed[k] === undefined && delete allowed[k]);
