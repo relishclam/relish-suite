@@ -19,7 +19,7 @@ export const ENTITY_ROLES = [
 ];
 
 // ─── Fetch all entity_roles for a company (with nested entity) ────────────────
-export async function fetchEntities(companyId, { search = '', activeOnly = true } = {}) {
+export async function fetchEntities(companyId, { search = '', activeOnly = true, roles = null } = {}) {
   let query = supabase
     .schema('registry')
     .from('entity_roles')
@@ -41,6 +41,7 @@ export async function fetchEntities(companyId, { search = '', activeOnly = true 
     .eq('company_id', companyId);
 
   if (activeOnly) query = query.eq('is_active', true);
+  if (roles && roles.length > 0) query = query.in('role', roles);
 
   const { data, error } = await query;
   if (error) throw error;

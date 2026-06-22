@@ -22,7 +22,7 @@ const TABS = [
   { key: 'entities', label: 'Entities', icon: '👥' },
   { key: 'tally', label: 'Tally Config', icon: '⚙️' },
   { key: 'clamflow', label: 'ClamFlow Suppliers', icon: '🦪', requiresClamFlow: true },
-  { key: 'personnel', label: 'Personnel', icon: '👷', requiresClamFlow: true },
+  { key: 'personnel', label: 'Company Personnel', icon: '👷' },
 ];
 
 export default function MasterData() {
@@ -88,7 +88,7 @@ export default function MasterData() {
         case 'tally': setTallyConf(await fetchTallyConfig(activeCompany.id)); break;
         case 'entities': setEntities(await fetchEntities(activeCompany.id, { search, activeOnly: !showInactive })); break;
         case 'clamflow': setCfSuppliers(await fetchClamFlowSuppliers({ search }).catch(() => [])); break;
-        case 'personnel': setCfStaff(await fetchClamFlowStaff({ search }).catch(() => [])); break;
+        case 'personnel': setEntities(await fetchEntities(activeCompany.id, { search, activeOnly: !showInactive, roles: ['Staff', 'Management', 'Contractor'] })); break;
       }
     } catch (err) {
       addToast(err.message, 'error');
@@ -480,22 +480,26 @@ export default function MasterData() {
           </>
         )}
 
-        {/* ═══ PERSONNEL ═══ */}
+        {/* ═══ COMPANY PERSONNEL ═══ */}
         {tab === 'personnel' && (
           <>
-            <div className="md-content__header"><h2>Personnel</h2><p className="text-muted">RHHF — Panavally Processing Plant (read-only)</p></div>
+            <div className="md-content__header"><h2>Company Personnel</h2></div>
             <div className="md-filter-bar">
-              <input className="form-input md-filter-bar__search" placeholder="Search staff…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input className="form-input md-filter-bar__search" placeholder="Search personnel…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <label className="md-filter-bar__toggle">
+                <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} /> Show inactive
+              </label>
             </div>
             {loading ? <LoadingSpinner /> : renderTable(
               [
-                { key: 'full_name', label: 'Name' },
-                { key: 'mobile', label: 'Mobile' },
-                { key: 'aadhar', label: 'Aadhaar', render: (r) => r.aadhar_number ? maskAadhaar(r.aadhar_number) : '—' },
-                { key: 'person_type', label: 'Type' },
-                { key: 'is_active', label: 'Status', render: (r) => <span className={`badge badge--${r.is_active !== false ? 'success' : 'muted'}`}>{r.is_active !== false ? 'Active' : 'Inactive'}</span> },
+                { key: 'name',        label: 'Name',        render: (r) => r.entity?.display_name || '—' },
+                { key: 'role',        label: 'Role',        render: (r) => r.role || '—' },
+                { key: 'department',  label: 'Department',  render: (r) => r.department || '—' },
+                { key: 'designation', label: 'Designation', render: (r) => r.designation || '—' },
+                { key: 'mobile',      label: 'Mobile',      render: (r) => r.entity?.mobile || '—' },
+                { key: 'is_active',   label: 'Status',      render: (r) => <span className={`badge badge--${r.is_active ? 'success' : 'muted'}`}>{r.is_active ? 'Active' : 'Inactive'}</span> },
               ],
-              cfStaff
+              entities
             )}
           </>
         )}
