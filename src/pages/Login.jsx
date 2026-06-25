@@ -5,15 +5,15 @@ import relishLogo from '../assets/relish-logo.png';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 export default function Login() {
-  const { user, loading: authLoading, signIn } = useAuth();
+  const { user, profile, loading: authLoading, signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Already authenticated → go to dashboard
+  // Already fully authenticated (auth session AND profile loaded) → dashboard
   if (authLoading) return <LoadingSpinner />;
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user && profile) return <Navigate to="/dashboard" replace />;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
