@@ -55,9 +55,14 @@ export function AuthProvider({ children }) {
         .from('profiles')
         .select('id, full_name, email, mobile, is_super_admin, is_active, entity_id')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (profileError) throw profileError;
+      if (!profileData) {
+        // New invited user — profile not created yet. Sign out cleanly.
+        await supabase.auth.signOut();
+        return;
+      }
       if (!profileData.is_active) {
         await supabase.auth.signOut();
         return;
