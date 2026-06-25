@@ -34,7 +34,11 @@ export default function UserManagement() {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
 
-  // Company assignment
+  // Company assignments for selected user
+  const [userComps,    setUserComps]    = useState([]);
+  const [compLoading,  setCompLoading]  = useState(false);
+
+  // Company assignment add-row
   const [assignCompId,  setAssignCompId]  = useState('');
   const [assignRole,    setAssignRole]    = useState('accounts');
 
