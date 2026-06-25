@@ -56,8 +56,9 @@ serve(async (req: Request) => {
     const { data: { user: callerUser }, error: authErr } = await caller.auth.getUser()
     if (authErr || !callerUser) return json({ error: 'Unauthorized' }, 401)
 
+    // Use caller client (authenticated role) — known to have SELECT on registry
     // Must be super_admin OR hold admin role in at least one company
-    const { data: profile } = await admin
+    const { data: profile } = await caller
       .schema('registry')
       .from('profiles')
       .select('is_super_admin')
@@ -65,7 +66,7 @@ serve(async (req: Request) => {
       .single()
 
     if (!profile?.is_super_admin) {
-      const { data: adminCu } = await admin
+      const { data: adminCu } = await caller
         .schema('registry')
         .from('company_users')
         .select('id')
@@ -90,14 +91,33 @@ serve(async (req: Request) => {
     }
 
     // ── Invite user ──────────────────────────────────────────────
+    let userId: string
+
     const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
       redirectTo: SUITE_SET_PASSWORD_URL,
       data: { full_name: fullName ?? '' },
     })
 
-    if (inviteErr) return json({ error: inviteErr.message }, 400)
+    if (inviteErr) {
+      // User already exists in auth.users (previous invite / sign-up).
+      // Look them up via profiles and proceed with company assignment.
+      const isAlreadyExists = inviteErr.message.toLowerCase().includes('already')
+      if (!isAlreadyExists) return json({ error: inviteErr.message }, 400)
 
-    const userId = inviteData.user.id
+      const { data: existingProfile, error: lookupErr } = await caller
+        .schema('registry')
+        .from('profiles')
+        .select('id')
+        .eq('email', email.trim().toLowerCase())
+        .maybeSingle()
+
+      if (lookupErr || !existingProfile) {
+        return json({ error: `User already registered but profile not found. Delete the existing auth user and retry.` }, 400)
+      }
+      userId = existingProfile.id
+    } else {
+      userId = inviteData.user.id
+    }
 
     // ── Upsert profile ───────────────────────────────────────────
     // The on_auth_user_created trigger fires immediately after invite and

@@ -7,6 +7,9 @@ dist/
 .DS_Store
 generate-icons.mjs
 
+# Supabase CLI artifacts
+supabase/.temp/
+
 # pramaana is a separate git repo
 pramaana/
 
