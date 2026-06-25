@@ -1849,11 +1849,31 @@
 .um-company-list__item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
   padding: 0.375rem 0.625rem;
   background: var(--bg);
   border-radius: var(--radius);
   font-size: 0.8125rem;
+}
+.um-company-list__name {
+  flex: 1;
+  min-width: 8rem;
+}
+.um-audit-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.form-input--sm {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.8125rem;
+  width: auto;
+  min-width: 6rem;
 }
 .um-assign-row {
   display: flex;

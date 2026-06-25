@@ -46,15 +46,15 @@ export async function fetchUserCompanies(userId) {
   const { data, error } = await supabase
     .schema('registry')
     .from('company_users')
-    .select('id, company_id, role, is_primary, company:companies(id, name, short_name, code)')
+    .select('id, company_id, role, is_primary, audit_edit_enabled, company:companies(id, name, short_name, code)')
     .eq('user_id', userId);
   if (error) throw error;
   return data;
 }
 
 // ─── Assign user to a company ────────────────────────────
-// role defaults to 'viewer' — company_users.role is NOT NULL
-export async function assignUserCompany(userId, companyId, role = 'viewer') {
+// role defaults to 'accounts' — company_users.role is NOT NULL
+export async function assignUserCompany(userId, companyId, role = 'accounts') {
   const { error } = await supabase
     .schema('registry')
     .from('company_users')
@@ -71,14 +71,34 @@ export async function removeUserCompany(companyUserId) {
     .eq('id', companyUserId);
   if (error) throw error;
 }
+// ─── Update role for a company_users row ──────────────────────
+export async function updateCompanyUserRole(companyUserId, role) {
+  const { error } = await supabase
+    .schema('registry')
+    .from('company_users')
+    .update({ role })
+    .eq('id', companyUserId);
+  if (error) throw error;
+}
 
-// ─── Create user via Supabase Auth (super_admin invites) ─
-// auth.admin.inviteUserByEmail() requires the service_role key and cannot be
-// called client-side (always 403). Routed through the invite-user Edge Function
-// which runs server-side with the service_role key and verifies is_super_admin.
-export async function inviteUser(email) {
+// ─── Toggle audit-edit mode for an auditor ────────────────────
+// When enabled, the auditor can rename ledgers and move vouchers
+// between ledgers in Pramaana. Revokable at any time by admin.
+export async function setAuditEditMode(companyUserId, enabled) {
+  const { error } = await supabase
+    .schema('registry')
+    .from('company_users')
+    .update({ audit_edit_enabled: enabled })
+    .eq('id', companyUserId);
+  if (error) throw error;
+}
+// ─── Create user via Supabase Auth (admin invites) ───────────
+// Routes through the invite-user Edge Function which runs server-side
+// with the service_role key, creates the profile + company assignment,
+// and sends an invite email with redirectTo pointing to /set-password.
+export async function inviteUser(email, fullName, companyId, role) {
   const { data, error } = await supabase.functions.invoke('invite-user', {
-    body: { email },
+    body: { email, fullName, companyId, role },
   });
   if (error) throw error;
   if (data?.error) throw new Error(data.error);

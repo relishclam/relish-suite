@@ -3,21 +3,22 @@ import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/common/Toast';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import SlideOver from '../components/common/SlideOver';
-import { fetchProfiles, updateProfile, fetchUserCompanies, assignUserCompany, removeUserCompany, inviteUser } from '../lib/profiles';
+import { fetchProfiles, updateProfile, fetchUserCompanies, assignUserCompany, removeUserCompany, inviteUser, updateCompanyUserRole, setAuditEditMode } from '../lib/profiles';
 import { fetchCompanies } from '../lib/companies';
 import { writeAuditLog } from '../lib/auditLog';
 
-const ROLES = [
-  { value: 'viewer', label: 'Viewer' },
-  { value: 'operations', label: 'Operations' },
+// Roles assignable to a company_users row.
+// Super Admin is a profile-level flag (is_super_admin), not a company role.
+const COMPANY_ROLES = [
+  { value: 'admin',    label: 'Admin'    },
   { value: 'accounts', label: 'Accounts' },
-  { value: 'admin', label: 'Admin' },
-  { value: 'super_admin', label: 'Super Admin' },
+  { value: 'auditor',  label: 'Auditor'  },
 ];
 
 export default function UserManagement() {
   const { activeRole } = useAuth();
-  const isSuperAdmin = activeRole === 'super_admin';
+  // Both super_admin (platform flag) and company admin can manage users
+  const canManageUsers = activeRole === 'super_admin' || activeRole === 'admin';
   const addToast = useToast();
 
   const [users, setUsers] = useState([]);
@@ -33,13 +34,15 @@ export default function UserManagement() {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
 
-  // Company assignments for selected user
-  const [userComps, setUserComps] = useState([]);
-  const [compLoading, setCompLoading] = useState(false);
-  const [assignCompId, setAssignCompId] = useState('');
+  // Company assignment
+  const [assignCompId,  setAssignCompId]  = useState('');
+  const [assignRole,    setAssignRole]    = useState('accounts');
 
   // Invite
-  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteEmail,    setInviteEmail]    = useState('');
+  const [inviteFullName, setInviteFullName] = useState('');
+  const [inviteCompanyId, setInviteCompanyId] = useState('');
+  const [inviteRole,     setInviteRole]     = useState('accounts');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -67,10 +70,11 @@ export default function UserManagement() {
   });
 
   // ── Open edit ──
+  // Open edit: also reset invite fields
   const openEdit = async (user) => {
     setSlideMode('edit');
     setSelectedUser(user);
-    setForm({ full_name: user.full_name || '', role: user.role || 'viewer', is_active: user.is_active });
+    setForm({ full_name: user.full_name || '', is_active: user.is_active });
     setSlideOpen(true);
     setCompLoading(true);
     try {
@@ -87,6 +91,9 @@ export default function UserManagement() {
     setSlideMode('invite');
     setSelectedUser(null);
     setInviteEmail('');
+    setInviteFullName('');
+    setInviteCompanyId('');
+    setInviteRole('accounts');
     setSlideOpen(true);
   };
 
@@ -95,6 +102,11 @@ export default function UserManagement() {
     setSelectedUser(null);
     setUserComps([]);
     setAssignCompId('');
+    setAssignRole('accounts');
+    setInviteEmail('');
+    setInviteFullName('');
+    setInviteCompanyId('');
+    setInviteRole('accounts');
   };
 
   // ── Save profile ──
@@ -104,7 +116,6 @@ export default function UserManagement() {
     try {
       await updateProfile(selectedUser.id, {
         full_name: form.full_name,
-        role: form.role,
         is_active: form.is_active,
       });
       writeAuditLog({ action: 'update', tableName: 'profiles', recordId: selectedUser.id });
@@ -137,13 +148,35 @@ export default function UserManagement() {
   const handleAssign = async () => {
     if (!selectedUser || !assignCompId) return;
     try {
-      await assignUserCompany(selectedUser.id, assignCompId);
+      await assignUserCompany(selectedUser.id, assignCompId, assignRole);
       writeAuditLog({ action: 'assign_company', tableName: 'user_companies', recordId: selectedUser.id });
       addToast('Company assigned', 'success');
       setAssignCompId('');
+      setAssignRole('accounts');
       setUserComps(await fetchUserCompanies(selectedUser.id));
     } catch (err) {
       addToast(err.message, 'error');
+    }
+  };
+
+  // ── Update role on an existing company assignment ──
+  const handleUpdateCompanyRole = async (companyUserId, role) => {
+    try {
+      await updateCompanyUserRole(companyUserId, role);
+      setUserComps((prev) => prev.map((uc) => uc.id === companyUserId ? { ...uc, role } : uc));
+    } catch (err) {
+      addToast('Role update failed: ' + err.message, 'error');
+    }
+  };
+
+  // ── Toggle audit-edit mode for an auditor ──
+  const handleToggleAuditEdit = async (companyUserId, enabled) => {
+    try {
+      await setAuditEditMode(companyUserId, enabled);
+      setUserComps((prev) => prev.map((uc) => uc.id === companyUserId ? { ...uc, audit_edit_enabled: enabled } : uc));
+      addToast(enabled ? 'Audit edit enabled' : 'Audit edit disabled', 'success');
+    } catch (err) {
+      addToast('Failed: ' + err.message, 'error');
     }
   };
 
@@ -161,10 +194,10 @@ export default function UserManagement() {
 
   // ── Invite user ──
   const handleInvite = async () => {
-    if (!inviteEmail) return;
+    if (!inviteEmail || !inviteFullName || !inviteCompanyId || !inviteRole) return;
     setSaving(true);
     try {
-      await inviteUser(inviteEmail);
+      await inviteUser(inviteEmail.trim().toLowerCase(), inviteFullName.trim(), inviteCompanyId, inviteRole);
       writeAuditLog({ action: 'invite', tableName: 'profiles' });
       addToast(`Invite sent to ${inviteEmail}`, 'success');
       closeSlide();
@@ -180,12 +213,12 @@ export default function UserManagement() {
   const assignedIds = new Set(userComps.map((uc) => uc.company_id));
   const availableCompanies = allCompanies.filter((c) => !assignedIds.has(c.id));
 
-  if (!isSuperAdmin) {
+  if (!canManageUsers) {
     return (
       <div className="um-page">
         <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>
           <h2>Access Denied</h2>
-          <p className="text-muted">User management is restricted to Super Admins.</p>
+          <p className="text-muted">User management requires Admin or Super Admin role.</p>
         </div>
       </div>
     );
@@ -214,8 +247,7 @@ export default function UserManagement() {
             <thead>
               <tr>
                 <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
+                <th>Platform Role</th>
                 <th>Status</th>
                 <th>Created</th>
               </tr>
@@ -225,9 +257,12 @@ export default function UserManagement() {
                 <tr><td colSpan={5} className="text-center text-muted" style={{ padding: '2rem' }}>No users found</td></tr>
               ) : filtered.map((u) => (
                 <tr key={u.id} className="md-table__row" onClick={() => openEdit(u)}>
-                  <td><strong>{u.full_name || '—'}</strong></td>
-                  <td>{u.email || '—'}</td>
-                  <td><span className={`badge badge--${u.role === 'super_admin' ? 'navy' : u.role === 'admin' ? 'teal' : 'default'}`}>{ROLES.find((r) => r.value === u.role)?.label || u.role}</span></td>
+                  <td><strong>{u.full_name || '—'}</strong><br /><span className="text-muted" style={{ fontSize: '0.75rem' }}>{u.email || ''}</span></td>
+                  <td>
+                    {u.is_super_admin
+                      ? <span className="badge badge--navy">Super Admin</span>
+                      : <span className="badge badge--default">See detail</span>}
+                  </td>
                   <td><span className={`badge badge--${u.is_active ? 'success' : 'muted'}`}>{u.is_active ? 'Active' : 'Inactive'}</span></td>
                   <td style={{ fontSize: '0.75rem' }}>{u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
                 </tr>
@@ -244,14 +279,31 @@ export default function UserManagement() {
         {slideMode === 'invite' && (
           <div className="md-slide-form">
             <p className="text-muted" style={{ marginBottom: '1rem', fontSize: '0.8125rem' }}>
-              Send a magic-link invite. The user will be created in Supabase Auth and can then sign in and be assigned companies/roles.
+              An invite email will be sent. The user sets their password on first login.
             </p>
             <div className="form-group">
+              <label className="form-label">Full Name *</label>
+              <input className="form-input" type="text" placeholder="e.g. Arun Kumar" value={inviteFullName} onChange={(e) => setInviteFullName(e.target.value)} />
+            </div>
+            <div className="form-group">
               <label className="form-label">Email Address *</label>
-              <input className="form-input" type="email" placeholder="user@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
+              <input className="form-input" type="email" placeholder="user@relishfoods.in" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Company *</label>
+              <select className="form-input" value={inviteCompanyId} onChange={(e) => setInviteCompanyId(e.target.value)}>
+                <option value="">Select company…</option>
+                {allCompanies.map((c) => <option key={c.id} value={c.id}>{c.short_name} — {c.name}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Role *</label>
+              <select className="form-input" value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
+                {COMPANY_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
             </div>
             <div className="md-slide-form__actions">
-              <button type="button" className="btn btn-primary" disabled={saving || !inviteEmail} onClick={handleInvite}>{saving ? 'Sending…' : 'Send Invite'}</button>
+              <button type="button" className="btn btn-primary" disabled={saving || !inviteEmail || !inviteFullName || !inviteCompanyId} onClick={handleInvite}>{saving ? 'Sending…' : 'Send Invite'}</button>
               <button type="button" className="btn" onClick={closeSlide}>Cancel</button>
             </div>
           </div>
@@ -276,12 +328,6 @@ export default function UserManagement() {
                   <label className="form-label">Full Name</label>
                   <input className="form-input" value={form.full_name || ''} onChange={(e) => setForm((p) => ({ ...p, full_name: e.target.value }))} />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Role</label>
-                  <select className="form-input" value={form.role || 'viewer'} onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}>
-                    {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                  </select>
-                </div>
               </div>
             </div>
 
@@ -296,7 +342,26 @@ export default function UserManagement() {
                     <div className="um-company-list">
                       {userComps.map((uc) => (
                         <div key={uc.id} className="um-company-list__item">
-                          <span>{uc.companies?.short_name || uc.company_id} — {uc.companies?.name || ''}</span>
+                          <span className="um-company-list__name">
+                            {uc.company?.short_name || uc.company_id} — {uc.company?.name || ''}
+                          </span>
+                          <select
+                            className="form-input form-input--sm"
+                            value={uc.role}
+                            onChange={(e) => handleUpdateCompanyRole(uc.id, e.target.value)}
+                          >
+                            {COMPANY_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                          </select>
+                          {uc.role === 'auditor' && (
+                            <label className="um-audit-toggle" title="Allow auditor to rename ledgers and move vouchers during audit">
+                              <input
+                                type="checkbox"
+                                checked={!!uc.audit_edit_enabled}
+                                onChange={(e) => handleToggleAuditEdit(uc.id, e.target.checked)}
+                              />
+                              <span>Audit Edit</span>
+                            </label>
+                          )}
                           <button type="button" className="btn btn-sm btn-danger-outline" onClick={() => handleRemoveComp(uc.id)}>Remove</button>
                         </div>
                       ))}
@@ -307,6 +372,9 @@ export default function UserManagement() {
                       <select className="form-input" value={assignCompId} onChange={(e) => setAssignCompId(e.target.value)}>
                         <option value="">Select company…</option>
                         {availableCompanies.map((c) => <option key={c.id} value={c.id}>{c.short_name} — {c.name}</option>)}
+                      </select>
+                      <select className="form-input form-input--sm" value={assignRole} onChange={(e) => setAssignRole(e.target.value)}>
+                        {COMPANY_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </select>
                       <button type="button" className="btn btn-sm btn-primary" disabled={!assignCompId} onClick={handleAssign}>Assign</button>
                     </div>
