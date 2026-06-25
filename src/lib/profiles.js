@@ -73,8 +73,14 @@ export async function removeUserCompany(companyUserId) {
 }
 
 // ─── Create user via Supabase Auth (super_admin invites) ─
+// auth.admin.inviteUserByEmail() requires the service_role key and cannot be
+// called client-side (always 403). Routed through the invite-user Edge Function
+// which runs server-side with the service_role key and verifies is_super_admin.
 export async function inviteUser(email) {
-  const { data, error } = await supabase.auth.admin.inviteUserByEmail(email);
+  const { data, error } = await supabase.functions.invoke('invite-user', {
+    body: { email },
+  });
   if (error) throw error;
+  if (data?.error) throw new Error(data.error);
   return data;
 }
