@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import relishLogo from '../assets/relish-logo.png';
@@ -9,6 +9,65 @@ export default function SetPassword() {
   const [confirm,   setConfirm]   = useState('');
   const [error,     setError]     = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const initializeSession = async () => {
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (!mounted) return;
+
+        if (currentSession?.user) {
+          setCheckingSession(false);
+          return;
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const tokenHash = params.get('token_hash') || hashParams.get('token_hash');
+        const tokenType = params.get('type') || hashParams.get('type');
+
+        if (tokenHash && tokenType) {
+          const { data, error: verifyErr } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: tokenType,
+          });
+
+          if (!mounted) return;
+          if (verifyErr) {
+            setError(verifyErr.message || 'The invite link could not be verified. Please request a fresh invite.');
+          } else if (data?.session?.user) {
+            setCheckingSession(false);
+            return;
+          }
+        }
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+          if (!mounted) return;
+          if (nextSession?.user) {
+            setCheckingSession(false);
+          }
+        });
+
+        return () => subscription.unsubscribe();
+      } catch (err) {
+        if (!mounted) return;
+        setError(err.message || 'The invite link could not be loaded.');
+      } finally {
+        if (mounted && !error) {
+          // preserve explicit error cases above
+        }
+      }
+    };
+
+    initializeSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,6 +84,11 @@ export default function SetPassword() {
 
     setSubmitting(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        throw new Error('Your invite session is not ready yet. Please open the link again or request a fresh invite.');
+      }
+
       const { error: updateErr } = await supabase.auth.updateUser({ password });
       if (updateErr) throw updateErr;
       navigate('/dashboard', { replace: true });
@@ -81,9 +145,9 @@ export default function SetPassword() {
           <button
             type="submit"
             className="btn btn-primary login-submit"
-            disabled={submitting}
+            disabled={submitting || checkingSession}
           >
-            {submitting ? 'Saving…' : 'Set Password & Sign In'}
+            {submitting ? 'Saving…' : checkingSession ? 'Preparing invite…' : 'Set Password & Sign In'}
           </button>
         </form>
       </div>
