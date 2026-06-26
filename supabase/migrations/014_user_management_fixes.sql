@@ -20,6 +20,19 @@ ALTER TABLE registry.company_users
 -- user immediately gets a registry.profiles row.
 -- full_name is seeded from raw_user_meta_data if the invite flow
 -- passes it; otherwise defaults to empty string (NOT NULL constraint).
+-- Also backfills any existing auth.users rows that were created before
+-- this migration and still lack a registry.profiles entry.
+INSERT INTO registry.profiles (id, email, full_name, is_active, is_super_admin)
+SELECT
+  u.id,
+  u.email,
+  COALESCE(u.raw_user_meta_data->>'full_name', ''),
+  TRUE,
+  FALSE
+FROM auth.users AS u
+LEFT JOIN registry.profiles AS p ON p.id = u.id
+WHERE p.id IS NULL;
+
 CREATE OR REPLACE FUNCTION registry.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
