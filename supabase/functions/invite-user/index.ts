@@ -2,15 +2,15 @@
 // Supabase Edge Function — runs server-side with service_role key.
 // Called by Suite UserManagement when an admin invites a new user.
 //
-// POST body: { email, fullName, companyId, role }
+// POST body: { email, fullName, companyId, role, password, userId }
 // role must be one of: admin | accounts | auditor
 //
 // Steps:
 //   1. Verify caller is super_admin or admin via their JWT.
-//   2. Create or re-use auth.users row and set a temporary password.
+//   2. Create or re-use auth.users row and set a password.
 //   3. Upsert registry.profiles (trigger may have fired already — safe).
-//   4. Insert registry.company_users with the chosen role.
-//   5. Return the temp password for the admin to share.
+//   4. Insert or upsert registry.company_users with the chosen role when company data is supplied.
+//   5. Return the password for the admin to share.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -79,36 +79,56 @@ serve(async (req: Request) => {
     }
 
     // ── Validate body ────────────────────────────────────────────
-    const { email, fullName, companyId, role } = await req.json()
+    const { email, fullName, companyId, role, password, userId: targetUserId } = await req.json()
 
-    if (!email || !companyId || !role) {
-      return json({ error: 'email, companyId and role are required' }, 400)
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : ''
+    const normalizedFullName = typeof fullName === 'string' ? fullName.trim() : ''
+
+    if (!normalizedEmail && !targetUserId) {
+      return json({ error: 'email or userId is required' }, 400)
+    }
+
+    if ((companyId && !role) || (!companyId && role)) {
+      return json({ error: 'companyId and role must be provided together' }, 400)
     }
 
     const validRoles = ['admin', 'accounts', 'auditor']
-    if (!validRoles.includes(role)) {
+    if (role && !validRoles.includes(role)) {
       return json({ error: 'role must be admin, accounts, or auditor' }, 400)
     }
 
-    // ── Create or re-use auth user and set a temporary password ──
-    let userId: string
-    const tempPassword = Math.random().toString(36).slice(-10) + 'Aa1!'
+    // ── Create or re-use auth user and set a password ──
+    let userId: string = targetUserId
+    const tempPassword = password?.trim() || (Math.random().toString(36).slice(-10) + 'Aa1!')
 
     const { data: existingUsers, error: listErr } = await admin.auth.admin.listUsers()
     if (listErr) return json({ error: `User lookup error: ${listErr.message}` }, 500)
 
-    const existingUser = existingUsers.users.find((u) => u.email?.toLowerCase() === email.trim().toLowerCase())
+    const existingUser = normalizedEmail
+      ? existingUsers.users.find((u) => u.email?.toLowerCase() === normalizedEmail)
+      : undefined
+
+    if (targetUserId) {
+      const { data: existingById, error: lookupErr } = await admin.auth.admin.getUserById(targetUserId)
+      if (lookupErr) return json({ error: `User lookup error: ${lookupErr.message}` }, 500)
+      if (existingById.user) {
+        userId = existingById.user.id
+      }
+    }
 
     if (existingUser) {
       userId = existingUser.id
+    }
+
+    if (userId) {
       const { error: pwErr } = await admin.auth.admin.updateUserById(userId, { password: tempPassword })
       if (pwErr) return json({ error: `Password update error: ${pwErr.message}` }, 500)
     } else {
       const { data: createData, error: createErr } = await admin.auth.admin.createUser({
-        email,
+        email: normalizedEmail,
         password: tempPassword,
         email_confirm: true,
-        user_metadata: { full_name: fullName ?? '' },
+        user_metadata: { full_name: normalizedFullName },
       })
 
       if (createErr) return json({ error: createErr.message }, 400)
@@ -123,21 +143,23 @@ serve(async (req: Request) => {
       .from('profiles')
       .upsert({
         id:             userId,
-        email:          email.trim().toLowerCase(),
-        full_name:      fullName?.trim() ?? '',
+        email:          normalizedEmail || null,
+        full_name:      normalizedFullName,
         is_active:      true,
         is_super_admin: false,
       }, { onConflict: 'id' })
 
     if (profileErr) return json({ error: `Profile error: ${profileErr.message}` }, 500)
 
-    // ── Create company_users row ─────────────────────────────────
-    const { error: cuErr } = await admin
-      .schema('registry')
-      .from('company_users')
-      .insert({ user_id: userId, company_id: companyId, role })
+    // ── Create company_users row when a company is supplied ─────
+    if (companyId && role) {
+      const { error: cuErr } = await admin
+        .schema('registry')
+        .from('company_users')
+        .upsert({ user_id: userId, company_id: companyId, role }, { onConflict: 'user_id,company_id' })
 
-    if (cuErr) return json({ error: `Company assignment error: ${cuErr.message}` }, 500)
+      if (cuErr) return json({ error: `Company assignment error: ${cuErr.message}` }, 500)
+    }
 
     return json({ success: true, userId, temporaryPassword: tempPassword })
 

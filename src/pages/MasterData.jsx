@@ -63,7 +63,7 @@ export default function MasterData() {
   const [cfLots, setCfLots] = useState([]);
   const [cfSummary, setCfSummary] = useState(null);
 
-  const canEdit = permissions.canManageMasterData;
+  const canEdit = permissions.canManageMasterData || activeRole === 'admin' || activeRole === 'super_admin';
   const canEditCompany = activeRole === 'super_admin';
   const canEditTally = permissions.canExportTally;
 

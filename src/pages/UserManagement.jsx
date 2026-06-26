@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/common/Toast';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import SlideOver from '../components/common/SlideOver';
-import { fetchProfiles, updateProfile, fetchUserCompanies, assignUserCompany, removeUserCompany, inviteUser, updateCompanyUserRole, setAuditEditMode } from '../lib/profiles';
+import { fetchProfiles, updateProfile, fetchUserCompanies, assignUserCompany, removeUserCompany, inviteUser, setUserDefaultPassword, updateCompanyUserRole, setAuditEditMode } from '../lib/profiles';
 import { fetchCompanies } from '../lib/companies';
 import { writeAuditLog } from '../lib/auditLog';
 
@@ -47,6 +47,7 @@ export default function UserManagement() {
   const [inviteFullName, setInviteFullName] = useState('');
   const [inviteCompanyId, setInviteCompanyId] = useState('');
   const [inviteRole,     setInviteRole]     = useState('accounts');
+  const [defaultPassword, setDefaultPassword] = useState('');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -79,6 +80,7 @@ export default function UserManagement() {
     setSlideMode('edit');
     setSelectedUser(user);
     setForm({ full_name: user.full_name || '', is_active: user.is_active });
+    setDefaultPassword('');
     setSlideOpen(true);
     setCompLoading(true);
     try {
@@ -111,6 +113,7 @@ export default function UserManagement() {
     setInviteFullName('');
     setInviteCompanyId('');
     setInviteRole('accounts');
+    setDefaultPassword('');
   };
 
   // ── Save profile ──
@@ -128,6 +131,22 @@ export default function UserManagement() {
       loadData();
     } catch (err) {
       addToast('Save failed: ' + err.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Set a temporary password for an existing user ──
+  const handleSetPassword = async () => {
+    if (!selectedUser || !defaultPassword.trim()) return;
+    setSaving(true);
+    try {
+      await setUserDefaultPassword(selectedUser.id, defaultPassword.trim(), selectedUser.email, form.full_name || selectedUser.full_name || '');
+      writeAuditLog({ action: 'set_password', tableName: 'profiles', recordId: selectedUser.id });
+      addToast('Password updated', 'success');
+      setDefaultPassword('');
+    } catch (err) {
+      addToast('Password update failed: ' + err.message, 'error');
     } finally {
       setSaving(false);
     }
@@ -332,6 +351,18 @@ export default function UserManagement() {
                   <label className="form-label">Full Name</label>
                   <input className="form-input" value={form.full_name || ''} onChange={(e) => setForm((p) => ({ ...p, full_name: e.target.value }))} />
                 </div>
+              </div>
+            </div>
+
+            {/* Password reset */}
+            <div className="um-section">
+              <h3 className="um-section__title">Temporary Password</h3>
+              <div className="form-group">
+                <label className="form-label">Default password</label>
+                <input className="form-input" type="password" value={defaultPassword} onChange={(e) => setDefaultPassword(e.target.value)} placeholder="Set a temporary password for this user" />
+              </div>
+              <div className="md-slide-form__actions" style={{ marginTop: '0.75rem' }}>
+                <button type="button" className="btn btn-primary btn-sm" disabled={saving || !defaultPassword.trim()} onClick={handleSetPassword}>{saving ? 'Updating…' : 'Set Password'}</button>
               </div>
             </div>
 

@@ -24,8 +24,13 @@ export function AuthProvider({ children }) {
   const activeRole = useMemo(() => {
     if (!profile) return null;
     if (profile.is_super_admin) return 'super_admin';
-    const activeCu = companyUsers.find((cu) => cu.company_id === activeCompany?.id);
-    return activeCu?.role ?? null;
+
+    const preferredCompanyId = activeCompany?.id
+      ?? companyUsers.find((cu) => cu.is_primary)?.company_id
+      ?? companyUsers[0]?.company_id;
+
+    const activeCu = companyUsers.find((cu) => cu.company_id === preferredCompanyId);
+    return activeCu?.role ?? companyUsers[0]?.role ?? null;
   }, [profile, companyUsers, activeCompany]);
 
   // ─── Derived: permission object

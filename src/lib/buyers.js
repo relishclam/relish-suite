@@ -10,6 +10,7 @@ export async function fetchBuyers(companyId) {
     .select(`
       id,
       role,
+      is_active,
       tally_ledger,
       entity:entities(
         id, display_name, alias, gstin, pan,
@@ -19,12 +20,11 @@ export async function fetchBuyers(companyId) {
       )
     `)
     .eq('company_id', companyId)
-    .eq('role', 'Customer')
-    .eq('is_active', true);
+    .eq('role', 'Customer');
   if (error) throw error;
-  return (data || []).sort((a, b) =>
-    (a.entity?.display_name || '').localeCompare(b.entity?.display_name || '')
-  );
+  return (data || [])
+    .filter((row) => row.is_active && row.entity?.is_active)
+    .sort((a, b) => (a.entity?.display_name || '').localeCompare(b.entity?.display_name || ''));
 }
 
 // ─── Fetch single buyer entity by entity_id ──────────────────────
@@ -97,23 +97,48 @@ export async function updateBuyer(entityId, updates) {
     is_active:    updates.is_active,
   };
   Object.keys(allowed).forEach((k) => allowed[k] === undefined && delete allowed[k]);
-  const { error } = await supabase
+  const { error: entityError } = await supabase
     .schema('registry')
     .from('entities')
     .update(allowed)
     .eq('id', entityId);
-  if (error) throw error;
+  if (entityError) throw entityError;
+
+  if (updates.is_active !== undefined) {
+    const { error: roleError } = await supabase
+      .schema('registry')
+      .from('entity_roles')
+      .update({ is_active: updates.is_active })
+      .eq('entity_id', entityId)
+      .eq('role', 'Customer');
+    if (roleError) throw roleError;
+  }
 }
 
 // ─── Toggle buyer active state (entity_roles.is_active) ──────────
 // Deactivating a buyer role hides it from buyer lists without
 // deleting the shared entity record.
 export async function toggleBuyerActive(entityRoleId, isActive) {
-  const { error } = await supabase
+  const { data: roleRow, error: roleLookupError } = await supabase
+    .schema('registry')
+    .from('entity_roles')
+    .select('entity_id')
+    .eq('id', entityRoleId)
+    .single();
+  if (roleLookupError) throw roleLookupError;
+
+  const { error: entityError } = await supabase
+    .schema('registry')
+    .from('entities')
+    .update({ is_active: isActive })
+    .eq('id', roleRow.entity_id);
+  if (entityError) throw entityError;
+
+  const { error: roleError } = await supabase
     .schema('registry')
     .from('entity_roles')
     .update({ is_active: isActive })
     .eq('id', entityRoleId);
-  if (error) throw error;
+  if (roleError) throw roleError;
 }
 
