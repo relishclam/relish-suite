@@ -7,10 +7,10 @@
 //
 // Steps:
 //   1. Verify caller is super_admin or admin via their JWT.
-//   2. Call auth.admin.inviteUserByEmail → creates auth.users row + sends
-//      invite email with redirectTo pointing to /set-password.
+//   2. Create or re-use auth.users row and set a temporary password.
 //   3. Upsert registry.profiles (trigger may have fired already — safe).
 //   4. Insert registry.company_users with the chosen role.
+//   5. Return the temp password for the admin to share.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -90,33 +90,29 @@ serve(async (req: Request) => {
       return json({ error: 'role must be admin, accounts, or auditor' }, 400)
     }
 
-    // ── Invite user ──────────────────────────────────────────────
+    // ── Create or re-use auth user and set a temporary password ──
     let userId: string
+    const tempPassword = Math.random().toString(36).slice(-10) + 'Aa1!'
 
-    const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: SUITE_SET_PASSWORD_URL,
-      data: { full_name: fullName ?? '' },
-    })
+    const { data: existingUsers, error: listErr } = await admin.auth.admin.listUsers()
+    if (listErr) return json({ error: `User lookup error: ${listErr.message}` }, 500)
 
-    if (inviteErr) {
-      // User already exists in auth.users (previous invite / sign-up).
-      // Look them up via profiles and proceed with company assignment.
-      const isAlreadyExists = inviteErr.message.toLowerCase().includes('already')
-      if (!isAlreadyExists) return json({ error: inviteErr.message }, 400)
+    const existingUser = existingUsers.users.find((u) => u.email?.toLowerCase() === email.trim().toLowerCase())
 
-      const { data: existingProfile, error: lookupErr } = await caller
-        .schema('registry')
-        .from('profiles')
-        .select('id')
-        .eq('email', email.trim().toLowerCase())
-        .maybeSingle()
-
-      if (lookupErr || !existingProfile) {
-        return json({ error: `User already registered but profile not found. Delete the existing auth user and retry.` }, 400)
-      }
-      userId = existingProfile.id
+    if (existingUser) {
+      userId = existingUser.id
+      const { error: pwErr } = await admin.auth.admin.updateUserById(userId, { password: tempPassword })
+      if (pwErr) return json({ error: `Password update error: ${pwErr.message}` }, 500)
     } else {
-      userId = inviteData.user.id
+      const { data: createData, error: createErr } = await admin.auth.admin.createUser({
+        email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: { full_name: fullName ?? '' },
+      })
+
+      if (createErr) return json({ error: createErr.message }, 400)
+      userId = createData.user.id
     }
 
     // ── Upsert profile ───────────────────────────────────────────
@@ -143,7 +139,7 @@ serve(async (req: Request) => {
 
     if (cuErr) return json({ error: `Company assignment error: ${cuErr.message}` }, 500)
 
-    return json({ success: true, userId })
+    return json({ success: true, userId, temporaryPassword: tempPassword })
 
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
