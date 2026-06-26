@@ -7,6 +7,7 @@ import ProtectedRoute from './components/common/ProtectedRoute';
 // Public pages
 import Landing from './pages/Landing';
 import Login from './pages/Login';
+import SetPassword from './pages/SetPassword';
 import NotFound from './pages/NotFound';
 
 // Authenticated pages
@@ -29,6 +30,7 @@ export default function App() {
       {/* Public */}
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/set-password" element={<SetPassword />} />
 
       {/* Authenticated — wrapped in AppLayout */}
       <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
