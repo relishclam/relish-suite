@@ -98,28 +98,24 @@ serve(async (req: Request) => {
     }
 
     // ── Create or re-use auth user and set a password ──
-    let userId: string = targetUserId
+    let userId: string = targetUserId ?? ''
     const tempPassword = password?.trim() || (Math.random().toString(36).slice(-10) + 'Aa1!')
 
-    const { data: existingUsers, error: listErr } = await admin.auth.admin.listUsers()
-    if (listErr) return json({ error: `User lookup error: ${listErr.message}` }, 500)
-
-    const existingUser = normalizedEmail
-      ? existingUsers.users.find((u) => u.email?.toLowerCase() === normalizedEmail)
-      : undefined
-
     if (targetUserId) {
-      const { data: existingById, error: lookupErr } = await admin.auth.admin.getUserById(targetUserId)
+      // Editing existing user — look up directly by ID (fast, no list needed)
+      const { data: byId, error: lookupErr } = await admin.auth.admin.getUserById(targetUserId)
       if (lookupErr) return json({ error: `User lookup error: ${lookupErr.message}` }, 500)
-      if (existingById.user) {
-        userId = existingById.user.id
-      }
+      if (byId?.user) userId = byId.user.id
+
+    } else if (normalizedEmail) {
+      // New user — search by email with pagination to avoid timeout
+      const { data: listData, error: listErr } = await admin.auth.admin.listUsers({ perPage: 1000, page: 1 })
+      if (listErr) return json({ error: `User lookup error: ${listErr.message}` }, 500)
+      const found = listData?.users?.find(u => u.email?.toLowerCase() === normalizedEmail)
+      if (found) userId = found.id
     }
 
-    if (existingUser) {
-      userId = existingUser.id
-    }
-
+    // Set password if user exists, else create new
     if (userId) {
       const { error: pwErr } = await admin.auth.admin.updateUserById(userId, { password: tempPassword })
       if (pwErr) return json({ error: `Password update error: ${pwErr.message}` }, 500)
