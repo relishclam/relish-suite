@@ -13,6 +13,7 @@ export default function SetPassword() {
 
   useEffect(() => {
     let mounted = true;
+    let subscription = null;
 
     const initializeSession = async () => {
       try {
@@ -26,8 +27,37 @@ export default function SetPassword() {
 
         const params = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const accessToken = params.get('access_token') || hashParams.get('access_token');
+        const refreshToken = params.get('refresh_token') || hashParams.get('refresh_token');
+        const code = params.get('code');
         const tokenHash = params.get('token_hash') || hashParams.get('token_hash');
         const tokenType = params.get('type') || hashParams.get('type');
+
+        if (accessToken && refreshToken) {
+          const { data, error: sessionErr } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (!mounted) return;
+          if (sessionErr) {
+            setError(sessionErr.message || 'The invite link could not be used.');
+          } else if (data?.session?.user) {
+            setCheckingSession(false);
+            return;
+          }
+        }
+
+        if (code) {
+          const { data, error: codeErr } = await supabase.auth.exchangeCodeForSession(code);
+          if (!mounted) return;
+          if (codeErr) {
+            setError(codeErr.message || 'The invite link could not be exchanged.');
+          } else if (data?.session?.user) {
+            setCheckingSession(false);
+            return;
+          }
+        }
 
         if (tokenHash && tokenType) {
           const { data, error: verifyErr } = await supabase.auth.verifyOtp({
@@ -44,20 +74,19 @@ export default function SetPassword() {
           }
         }
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+        const authSubscription = supabase.auth.onAuthStateChange((_event, nextSession) => {
           if (!mounted) return;
           if (nextSession?.user) {
             setCheckingSession(false);
           }
         });
-
-        return () => subscription.unsubscribe();
+        subscription = authSubscription;
       } catch (err) {
         if (!mounted) return;
         setError(err.message || 'The invite link could not be loaded.');
       } finally {
         if (mounted && !error) {
-          // preserve explicit error cases above
+          setCheckingSession(false);
         }
       }
     };
@@ -66,6 +95,7 @@ export default function SetPassword() {
 
     return () => {
       mounted = false;
+      if (subscription) subscription.data.subscription.unsubscribe();
     };
   }, []);
 
