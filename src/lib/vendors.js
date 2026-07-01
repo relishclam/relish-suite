@@ -71,20 +71,25 @@ export async function createVendor(companyId, vendorData) {
     });
   if (entityError) throw entityError;
 
-  const roleId = crypto.randomUUID();
+  // Create a Vendor role for every active company so the vendor
+  // is available across all companies (RHHF + RFPL share a vendor pool).
+  const { data: allCompanies } = await supabase
+    .schema('registry').from('companies').select('id').eq('is_active', true);
+  const companyIds = (allCompanies || []).map((c) => c.id);
+  const targets = companyIds.length > 0 ? companyIds : [companyId];
+
   const { error: roleError } = await supabase
     .schema('registry')
     .from('entity_roles')
-    .insert({
-      id: roleId,
+    .insert(targets.map((cid) => ({
       entity_id: entityId,
-      company_id: companyId,
+      company_id: cid,
       role: 'Vendor',
       is_active: true,
-    });
+    })));
   if (roleError) throw roleError;
 
-  return { entity: { id: entityId }, role: { id: roleId } };
+  return { entity: { id: entityId } };
 }
 
 // ─── Request a new vendor (accounts staff) ───────────────────────
@@ -160,6 +165,8 @@ export async function fetchPendingVendors(companyId) {
 }
 
 // ─── Approve a pending vendor request ───────────────────────────
+// Activates the entity + the requested role, then ensures the vendor
+// is also active in every other company (shared vendor pool).
 export async function approveVendorRequest(entityId, roleId) {
   const { error: entityError } = await supabase
     .schema('registry').from('entities')
@@ -172,6 +179,26 @@ export async function approveVendorRequest(entityId, roleId) {
     .update({ is_active: true, approval_status: 'approved' })
     .eq('id', roleId);
   if (roleError) throw roleError;
+
+  // Propagate to any companies that don't yet have a Vendor role for this entity.
+  const [{ data: allCompanies }, { data: existingRoles }] = await Promise.all([
+    supabase.schema('registry').from('companies').select('id').eq('is_active', true),
+    supabase.schema('registry').from('entity_roles')
+      .select('company_id').eq('entity_id', entityId).eq('role', 'Vendor'),
+  ]);
+  const covered = new Set((existingRoles || []).map((r) => r.company_id));
+  const missing = (allCompanies || []).map((c) => c.id).filter((id) => !covered.has(id));
+  if (missing.length > 0) {
+    await supabase.schema('registry').from('entity_roles').insert(
+      missing.map((cid) => ({
+        entity_id: entityId,
+        company_id: cid,
+        role: 'Vendor',
+        is_active: true,
+        approval_status: 'approved',
+      }))
+    );
+  }
 }
 
 // ─── Reject a pending vendor request ────────────────────────────
