@@ -45,6 +45,7 @@ const ROLE_PERMISSIONS = {
     canApprovePayments:  false,
     canManageUsers:      false,
     canManageMasterData: false,
+    canRequestVendor:    true,
     canExportTally:      true,
     canViewClamFlow:     false,
     canManageOnboarding: false,

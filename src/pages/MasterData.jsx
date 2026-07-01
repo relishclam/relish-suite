@@ -5,7 +5,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import SlideOver from '../components/common/SlideOver';
 import { fetchCompanies, fetchCompany, updateCompany } from '../lib/companies';
 import { fetchCompanyBankAccounts, createCompanyBankAccount, updateCompanyBankAccount, deleteCompanyBankAccount } from '../lib/companyBankAccounts';
-import { fetchVendors, createVendor, updateVendor, toggleVendorActive } from '../lib/vendors';
+import { fetchVendors, createVendor, updateVendor, toggleVendorActive, requestVendor, fetchPendingVendors, approveVendorRequest, rejectVendorRequest } from '../lib/vendors';
 import { fetchBuyers, createBuyer, updateBuyer, toggleBuyerActive } from '../lib/buyers';
 import { fetchProducts, createProduct, updateProduct, toggleProductActive } from '../lib/products';
 import { fetchDeliveryAddresses, createDeliveryAddress, updateDeliveryAddress, toggleDeliveryAddressActive } from '../lib/deliveryAddresses';
@@ -45,6 +45,7 @@ export default function MasterData() {
   // Data
   const [companies, setCompanies] = useState([]);
   const [vendors, setVendors] = useState([]);
+  const [pendingVendors, setPendingVendors] = useState([]);
   const [buyers, setBuyers] = useState([]);
   const [products, setProducts] = useState([]);
   const [addresses, setAddresses] = useState([]);
@@ -75,6 +76,7 @@ export default function MasterData() {
   const canEdit = permissions.canManageMasterData || activeRole === 'admin' || activeRole === 'super_admin';
   const canEditCompany = activeRole === 'super_admin';
   const canEditTally = permissions.canExportTally;
+  const canRequestVendor = !canEdit && !!permissions.canRequestVendor;
 
   const visibleTabs = TABS.filter((t) => {
     if (t.requiresClamFlow && !permissions.canViewClamFlow) return false;
@@ -90,7 +92,10 @@ export default function MasterData() {
     try {
       switch (tab) {
         case 'companies': setCompanies(await fetchCompanies()); break;
-        case 'vendors': setVendors(await fetchVendors(activeCompany.id)); break;
+        case 'vendors':
+          setVendors(await fetchVendors(activeCompany.id));
+          if (canEdit) setPendingVendors(await fetchPendingVendors(activeCompany.id));
+          break;
         case 'buyers': setBuyers(await fetchBuyers(activeCompany.id)); break;
         case 'products': setProducts(await fetchProducts(activeCompany.id, { search, activeOnly: !showInactive })); break;
         case 'delivery': setAddresses(await fetchDeliveryAddresses(activeCompany.id)); break;
@@ -311,6 +316,9 @@ export default function MasterData() {
         {visibleTabs.map((t) => (
           <button key={t.key} type="button" className={`md-sidebar__item${tab === t.key ? ' md-sidebar__item--active' : ''}`} onClick={() => setTab(t.key)}>
             <span className="md-sidebar__icon">{t.icon}</span> {t.label}
+            {t.key === 'vendors' && canEdit && pendingVendors.length > 0 && (
+              <span className="badge badge--warning" style={{ marginLeft: 'auto', fontSize: '0.7rem', minWidth: '1.25rem', textAlign: 'center' }}>{pendingVendors.length}</span>
+            )}
           </button>
         ))}
       </nav>
@@ -697,16 +705,21 @@ export default function MasterData() {
                   if (editing) {
                     await updateVendor(editing.entity.id, form);
                     writeAuditLog({ companyId: activeCompany?.id, action: 'update', tableName: 'registry.entities', recordId: editing.entity.id });
+                    addToast('Updated successfully', 'success');
+                  } else if (canRequestVendor) {
+                    const requesterName = user?.profile?.full_name || user?.email || 'Accounts Staff';
+                    await requestVendor(activeCompany.id, form, requesterName);
+                    addToast('Vendor request submitted — pending admin approval', 'success');
                   } else {
                     const result = await createVendor(activeCompany.id, form);
                     writeAuditLog({ companyId: activeCompany?.id, action: 'create', tableName: 'registry.entities', recordId: result.entity.id });
+                    addToast('Created successfully', 'success');
                   }
-                  addToast(editing ? 'Updated successfully' : 'Created successfully', 'success');
                   closeSlide();
                   loadTab();
                 } catch (err) { addToast('Save failed: ' + err.message, 'error'); }
                 finally { setSaving(false); }
-              }}>{saving ? 'Saving…' : editing ? 'Update' : 'Create'}</button>
+              }}>{saving ? 'Saving…' : editing ? 'Update' : canRequestVendor ? 'Submit for Approval' : 'Create'}</button>
               <button type="button" className="btn" onClick={closeSlide}>Cancel</button>
               {editing && (
                 <button type="button" className={`btn btn-sm ${editing.entity?.is_active ? 'btn-danger-outline' : ''}`} style={{ marginLeft: 'auto' }} onClick={() => { handleToggle(toggleVendorActive, editing.id, !editing.entity?.is_active, 'vendors'); closeSlide(); }}>

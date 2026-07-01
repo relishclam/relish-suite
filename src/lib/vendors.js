@@ -85,6 +85,100 @@ export async function createVendor(companyId, vendorData) {
   return { entity: { id: entityId }, role: { id: roleId } };
 }
 
+// ─── Request a new vendor (accounts staff) ───────────────────────
+// Creates entity + role as inactive / pending. Admin must approve.
+export async function requestVendor(companyId, vendorData, requestedByName) {
+  const entityId = crypto.randomUUID();
+  const { error: entityError } = await supabase
+    .schema('registry')
+    .from('entities')
+    .insert({
+      id:                  entityId,
+      type:                'ORGANISATION',
+      display_name:        vendorData.name,
+      alias:               vendorData.vendor_code ?? null,
+      gstin:               vendorData.gstin ?? null,
+      mobile:              vendorData.phone ?? null,
+      email:               vendorData.email ?? null,
+      address_line1:       vendorData.address_line1 ?? null,
+      address_line2:       vendorData.address_line2 ?? null,
+      city:                vendorData.city ?? null,
+      state:               vendorData.state ?? null,
+      pincode:             vendorData.postal_code ?? null,
+      bank_name:           vendorData.bank_name ?? null,
+      bank_account_holder: vendorData.bank_account_holder ?? null,
+      bank_account_number: vendorData.bank_account_number ?? null,
+      bank_ifsc:           vendorData.bank_ifsc ?? null,
+      upi_id:              vendorData.upi_id ?? null,
+      is_active:           false,   // inactive until approved
+      source_app:          'suite',
+    });
+  if (entityError) throw entityError;
+
+  const { error: roleError } = await supabase
+    .schema('registry')
+    .from('entity_roles')
+    .insert({
+      entity_id:              entityId,
+      company_id:             companyId,
+      role:                   'Vendor',
+      is_active:              false,
+      approval_status:        'pending',
+      approval_requested_by:  requestedByName,
+      approval_requested_at:  new Date().toISOString(),
+    });
+  if (roleError) throw roleError;
+
+  return { entity: { id: entityId } };
+}
+
+// ─── Fetch pending vendor requests (admin view) ──────────────────
+export async function fetchPendingVendors(companyId) {
+  const { data, error } = await supabase
+    .schema('registry')
+    .from('entity_roles')
+    .select(`
+      id,
+      role,
+      approval_status,
+      approval_requested_by,
+      approval_requested_at,
+      entity:entities(
+        id, display_name, gstin, mobile, email, city, state
+      )
+    `)
+    .eq('company_id', companyId)
+    .eq('role', 'Vendor')
+    .eq('approval_status', 'pending');
+  if (error) throw error;
+  return (data || []).sort((a, b) =>
+    new Date(b.approval_requested_at) - new Date(a.approval_requested_at));
+}
+
+// ─── Approve a pending vendor request ───────────────────────────
+export async function approveVendorRequest(entityId, roleId) {
+  const { error: entityError } = await supabase
+    .schema('registry').from('entities')
+    .update({ is_active: true })
+    .eq('id', entityId);
+  if (entityError) throw entityError;
+
+  const { error: roleError } = await supabase
+    .schema('registry').from('entity_roles')
+    .update({ is_active: true, approval_status: 'approved' })
+    .eq('id', roleId);
+  if (roleError) throw roleError;
+}
+
+// ─── Reject a pending vendor request ────────────────────────────
+export async function rejectVendorRequest(roleId) {
+  const { error } = await supabase
+    .schema('registry').from('entity_roles')
+    .update({ approval_status: 'rejected' })
+    .eq('id', roleId);
+  if (error) throw error;
+}
+
 // ─── Update vendor: update entity fields only ────────────────────
 export async function updateVendor(entityId, updates) {
   const allowed = {
