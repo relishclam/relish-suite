@@ -42,6 +42,7 @@ export async function fetchVendor(entityId) {
 
 // ─── Create vendor: insert entity then entity_role ────────────────
 export async function createVendor(companyId, vendorData) {
+  const { data: { user } } = await supabase.auth.getUser();
   const entityId = crypto.randomUUID();
   const { error: entityError } = await supabase
     .schema('registry')
@@ -66,6 +67,7 @@ export async function createVendor(companyId, vendorData) {
       upi_id:              vendorData.upi_id ?? null,
       is_active: true,
       source_app: 'suite',
+      created_by: user.id,
     });
   if (entityError) throw entityError;
 
@@ -88,6 +90,7 @@ export async function createVendor(companyId, vendorData) {
 // ─── Request a new vendor (accounts staff) ───────────────────────
 // Creates entity + role as inactive / pending. Admin must approve.
 export async function requestVendor(companyId, vendorData, requestedByName) {
+  const { data: { user } } = await supabase.auth.getUser();
   const entityId = crypto.randomUUID();
   const { error: entityError } = await supabase
     .schema('registry')
@@ -112,6 +115,7 @@ export async function requestVendor(companyId, vendorData, requestedByName) {
       upi_id:              vendorData.upi_id ?? null,
       is_active:           false,   // inactive until approved
       source_app:          'suite',
+      created_by:          user.id,
     });
   if (entityError) throw entityError;
 
