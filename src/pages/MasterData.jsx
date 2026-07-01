@@ -346,7 +346,35 @@ export default function MasterData() {
         {tab === 'vendors' && (
           <>
             <div className="md-content__header"><h2>Vendors</h2><p className="text-muted">{activeCompany?.short_name}</p></div>
-            {renderFilterBar('Search vendors…', '+ Add Vendor', () => openNew('New Vendor', { is_active: true }))}
+            <div className="md-filter-bar">
+              <input className="form-input md-filter-bar__search" placeholder="Search vendors…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <label className="md-filter-bar__toggle">
+                <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} /> Show inactive
+              </label>
+              {canEdit && <button type="button" className="btn btn-primary btn-sm" onClick={() => openNew('New Vendor', { is_active: true })}>+ Add Vendor</button>}
+              {canRequestVendor && <button type="button" className="btn btn-primary btn-sm" onClick={() => openNew('New Vendor', { is_active: true })}>+ Request Vendor</button>}
+            </div>
+            {canEdit && pendingVendors.length > 0 && (
+              <div style={{ margin: '0 0 1rem', padding: '1rem', background: 'var(--warning-bg, #fffbeb)', border: '1px solid var(--warning-border, #fcd34d)', borderRadius: '8px' }}>
+                <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>⏳ Pending Vendor Requests ({pendingVendors.length})</p>
+                <table className="md-table" style={{ fontSize: '0.85rem' }}>
+                  <thead><tr><th>Vendor Name</th><th>City</th><th>GSTIN</th><th>Requested By</th><th>Requested At</th><th></th></tr></thead>
+                  <tbody>{pendingVendors.map((v) => (
+                    <tr key={v.id}>
+                      <td>{v.entity?.display_name || '—'}</td>
+                      <td>{v.entity?.city || '—'}</td>
+                      <td>{v.entity?.gstin || '—'}</td>
+                      <td>{v.approval_requested_by || '—'}</td>
+                      <td>{v.approval_requested_at ? new Date(v.approval_requested_at).toLocaleDateString('en-IN') : '—'}</td>
+                      <td style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button type="button" className="btn btn-sm btn-success" onClick={async () => { try { await approveVendorRequest(v.entity?.id, v.id); addToast('Vendor approved', 'success'); loadTab(); } catch(e) { addToast('Failed: ' + e.message, 'error'); } }}>✓ Approve</button>
+                        <button type="button" className="btn btn-sm btn-danger-outline" onClick={async () => { try { await rejectVendorRequest(v.id); addToast('Vendor request rejected', 'success'); loadTab(); } catch(e) { addToast('Failed: ' + e.message, 'error'); } }}>× Reject</button>
+                      </td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            )}
             {loading ? <LoadingSpinner /> : renderTable(
               [
                 { key: 'display_name', label: 'Vendor Name', render: (r) => r.entity?.display_name || '—' },
@@ -358,10 +386,6 @@ export default function MasterData() {
               vendors,
               canEdit ? (r) => openEdit('Edit Vendor', r) : undefined
             )}
-          </>
-        )}
-
-        {/* ═══ BUYERS ═══ */}
         {tab === 'buyers' && (
           <>
             <div className="md-content__header"><h2>Buyers</h2><p className="text-muted">{activeCompany?.short_name}</p></div>
