@@ -386,6 +386,10 @@ export default function MasterData() {
               vendors,
               canEdit ? (r) => openEdit('Edit Vendor', r) : undefined
             )}
+          </>
+        )}
+
+        {/* ═══ BUYERS ═══ */}
         {tab === 'buyers' && (
           <>
             <div className="md-content__header"><h2>Buyers</h2><p className="text-muted">{activeCompany?.short_name}</p></div>
