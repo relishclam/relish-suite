@@ -4,6 +4,7 @@ import { useToast } from '../components/common/Toast';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import SlideOver from '../components/common/SlideOver';
 import { fetchCompanies, fetchCompany, updateCompany } from '../lib/companies';
+import { fetchCompanyBankAccounts, createCompanyBankAccount, updateCompanyBankAccount, deleteCompanyBankAccount } from '../lib/companyBankAccounts';
 import { fetchVendors, createVendor, updateVendor, toggleVendorActive } from '../lib/vendors';
 import { fetchBuyers, createBuyer, updateBuyer, toggleBuyerActive } from '../lib/buyers';
 import { fetchProducts, createProduct, updateProduct, toggleProductActive } from '../lib/products';
@@ -14,7 +15,7 @@ import { fetchClamFlowSuppliers, fetchClamFlowSupplier, fetchOnboardingStatus, f
 import { writeAuditLog } from '../lib/auditLog';
 
 const TABS = [
-  { key: 'companies', label: 'Companies', icon: '🏢' },
+  { key: 'companies', label: 'Company Profiles', icon: '🏢' },
   { key: 'vendors', label: 'Vendors', icon: '📦' },
   { key: 'buyers', label: 'Buyers', icon: '🛒' },
   { key: 'products', label: 'Products', icon: '🏷️' },
@@ -56,6 +57,14 @@ export default function MasterData() {
   const [entityRoles, setEntityRoles] = useState([]);
   const [addRoleMode, setAddRoleMode] = useState(false);
   const [addRoleForm, setAddRoleForm] = useState({});
+
+  // Bank accounts (Companies tab)
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [bankForm, setBankForm] = useState({});
+  const [editingBank, setEditingBank] = useState(null);
+  const [bankFormOpen, setBankFormOpen] = useState(false);
+  const [savingBank, setSavingBank] = useState(false);
+  const [confirmDeleteBankId, setConfirmDeleteBankId] = useState(null);
 
   // ClamFlow supplier detail slide-over
   const [cfDetail, setCfDetail] = useState(null);
@@ -133,6 +142,13 @@ export default function MasterData() {
     } else {
       setForm({ ...record });
     }
+    if (tab === 'companies') {
+      setBankAccounts([]);
+      setBankFormOpen(false);
+      setEditingBank(null);
+      setBankForm({});
+      fetchCompanyBankAccounts(record.id).then(setBankAccounts).catch(() => {});
+    }
     setSlideTitle(title);
     setSlideOpen(true);
   };
@@ -141,6 +157,8 @@ export default function MasterData() {
     setSlideOpen(false); setEditing(null); setForm({}); setCfDetail(null);
     setDupMatches([]); setShowDupWarning(false); setEntityRoles([]);
     setAddRoleMode(false); setAddRoleForm({});
+    setBankAccounts([]); setBankForm({}); setEditingBank(null); setBankFormOpen(false);
+    setConfirmDeleteBankId(null);
   };
 
   // ── ClamFlow supplier detail ──
@@ -302,7 +320,7 @@ export default function MasterData() {
         {/* ═══ COMPANIES ═══ */}
         {tab === 'companies' && (
           <>
-            <div className="md-content__header"><h2>Companies</h2></div>
+            <div className="md-content__header"><h2>Company Profiles</h2></div>
             {loading ? <LoadingSpinner /> : renderTable(
               [
                 { key: 'short_name', label: 'Code' },
@@ -525,6 +543,126 @@ export default function MasterData() {
               <div className="md-slide-form__actions">
                 <button type="button" className="btn btn-primary" disabled={saving} onClick={saveCompany}>{saving ? 'Saving…' : 'Save'}</button>
                 <button type="button" className="btn" onClick={closeSlide}>Cancel</button>
+              </div>
+            )}
+
+            {/* ── Bank Accounts sub-section ── */}
+            {editing && (
+              <div style={{ marginTop: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 600 }}>Bank Accounts</h3>
+                  {canEditCompany && !bankFormOpen && (
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => { setEditingBank(null); setBankForm({ company_id: editing.id, is_primary: false, is_active: true }); setBankFormOpen(true); }}>+ Add Account</button>
+                  )}
+                </div>
+
+                {/* Add / Edit form */}
+                {bankFormOpen && (
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '1rem', marginBottom: '1rem' }}>
+                    <div className="po-form__grid">
+                      <div className="form-group form-group--span2">
+                        <label className="form-label">Label *</label>
+                        <input className="form-input" value={bankForm.label || ''} onChange={(e) => setBankForm((p) => ({ ...p, label: e.target.value }))} placeholder="e.g. RHHF HDFC Current A/C" maxLength={120} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Account Holder Name</label>
+                        <input className="form-input" value={bankForm.account_holder_name || ''} onChange={(e) => setBankForm((p) => ({ ...p, account_holder_name: e.target.value }))} placeholder="As per bank records" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Bank Name</label>
+                        <input className="form-input" value={bankForm.bank_name || ''} onChange={(e) => setBankForm((p) => ({ ...p, bank_name: e.target.value }))} placeholder="e.g. HDFC Bank" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Account Number</label>
+                        <input className="form-input" value={bankForm.bank_account_number || ''} onChange={(e) => setBankForm((p) => ({ ...p, bank_account_number: e.target.value }))} placeholder="Account number" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">IFSC Code</label>
+                        <input className="form-input" value={bankForm.bank_ifsc || ''} onChange={(e) => setBankForm((p) => ({ ...p, bank_ifsc: e.target.value.toUpperCase() }))} placeholder="e.g. HDFC0001234" maxLength={11} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">UPI ID</label>
+                        <input className="form-input" value={bankForm.upi_id || ''} onChange={(e) => setBankForm((p) => ({ ...p, upi_id: e.target.value }))} placeholder="e.g. relishfoods@hdfcbank" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Primary Account</label>
+                        <label className="md-toggle"><input type="checkbox" checked={!!bankForm.is_primary} onChange={(e) => setBankForm((p) => ({ ...p, is_primary: e.target.checked }))} /> Set as primary</label>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Active</label>
+                        <label className="md-toggle"><input type="checkbox" checked={!!bankForm.is_active} onChange={(e) => setBankForm((p) => ({ ...p, is_active: e.target.checked }))} /> Active</label>
+                      </div>
+                    </div>
+                    <div className="md-slide-form__actions" style={{ marginTop: '0.75rem' }}>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        disabled={savingBank || !bankForm.label?.trim()}
+                        onClick={async () => {
+                          setSavingBank(true);
+                          try {
+                            const payload = Object.fromEntries(Object.entries(bankForm).map(([k, v]) => [k, v === '' ? null : v]));
+                            if (editingBank) {
+                              await updateCompanyBankAccount(editingBank.id, payload);
+                            } else {
+                              await createCompanyBankAccount(payload);
+                            }
+                            const refreshed = await fetchCompanyBankAccounts(editing.id);
+                            setBankAccounts(refreshed);
+                            setBankFormOpen(false);
+                            setEditingBank(null);
+                            setBankForm({});
+                            addToast(editingBank ? 'Bank account updated' : 'Bank account added', 'success');
+                          } catch (err) {
+                            addToast('Save failed: ' + err.message, 'error');
+                          } finally {
+                            setSavingBank(false);
+                          }
+                        }}
+                      >{savingBank ? 'Saving…' : (editingBank ? 'Update' : 'Add Account')}</button>
+                      <button type="button" className="btn btn-sm" onClick={() => { setBankFormOpen(false); setEditingBank(null); setBankForm({}); }}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Accounts list */}
+                {bankAccounts.length === 0 && !bankFormOpen && (
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>No bank accounts added yet.</p>
+                )}
+                {bankAccounts.map((acct) => (
+                  <div key={acct.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+                          <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{acct.label}</span>
+                          {acct.is_primary && <span className="badge badge--success" style={{ fontSize: '0.7rem' }}>Primary</span>}
+                          {!acct.is_active && <span className="badge badge--muted" style={{ fontSize: '0.7rem' }}>Inactive</span>}
+                        </div>
+                        <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                          {acct.bank_name && <span>{acct.bank_name}</span>}
+                          {acct.bank_account_number && <span> · A/C {acct.bank_account_number}</span>}
+                          {acct.bank_ifsc && <span> · IFSC {acct.bank_ifsc}</span>}
+                          {acct.upi_id && <div>UPI: {acct.upi_id}</div>}
+                        </div>
+                      </div>
+                      {canEditCompany && (
+                        <div style={{ display: 'flex', gap: '0.375rem', flexShrink: 0 }}>
+                          {confirmDeleteBankId === acct.id ? (
+                            <>
+                              <button type="button" className="btn btn-sm" style={{ background: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.4)', color: '#ef4444' }} onClick={async () => { try { await deleteCompanyBankAccount(acct.id); setBankAccounts((p) => p.filter((a) => a.id !== acct.id)); setConfirmDeleteBankId(null); addToast('Removed', 'success'); } catch (err) { addToast(err.message, 'error'); } }}>Confirm</button>
+                              <button type="button" className="btn btn-sm" onClick={() => setConfirmDeleteBankId(null)}>Cancel</button>
+                            </>
+                          ) : (
+                            <>
+                              <button type="button" className="btn btn-sm" onClick={() => { setEditingBank(acct); setBankForm({ ...acct }); setBankFormOpen(true); }}>Edit</button>
+                              <button type="button" className="btn btn-sm" onClick={() => setConfirmDeleteBankId(acct.id)}>Remove</button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
