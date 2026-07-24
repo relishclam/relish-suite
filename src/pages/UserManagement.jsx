@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/common/Toast';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import SlideOver from '../components/common/SlideOver';
-import { fetchProfiles, updateProfile, fetchUserCompanies, assignUserCompany, removeUserCompany, inviteUser, setUserDefaultPassword, updateCompanyUserRole, setAuditEditMode } from '../lib/profiles';
+import { fetchProfiles, fetchAllCompanyUsers, updateProfile, fetchUserCompanies, assignUserCompany, removeUserCompany, inviteUser, setUserDefaultPassword, updateCompanyUserRole, setAuditEditMode } from '../lib/profiles';
 import { fetchCompanies } from '../lib/companies';
 import { writeAuditLog } from '../lib/auditLog';
 
@@ -52,8 +52,16 @@ export default function UserManagement() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [profilesData, companiesData] = await Promise.all([fetchProfiles(), fetchCompanies()]);
-      setUsers(profilesData);
+      const [profilesData, companiesData, allCuData] = await Promise.all([
+        fetchProfiles(), fetchCompanies(), fetchAllCompanyUsers(),
+      ]);
+      // Group company_users rows by user_id so we can show roles in the list
+      const cuByUser = {};
+      allCuData.forEach((cu) => {
+        if (!cuByUser[cu.user_id]) cuByUser[cu.user_id] = [];
+        cuByUser[cu.user_id].push(cu);
+      });
+      setUsers(profilesData.map((p) => ({ ...p, companyRoles: cuByUser[p.id] ?? [] })));
       setAllCompanies(companiesData);
     } catch (err) {
       addToast(err.message, 'error');
@@ -282,9 +290,20 @@ export default function UserManagement() {
                 <tr key={u.id} className="md-table__row" onClick={() => openEdit(u)}>
                   <td><strong>{u.full_name || '—'}</strong><br /><span className="text-muted" style={{ fontSize: '0.75rem' }}>{u.email || ''}</span></td>
                   <td>
-                    {u.is_super_admin
-                      ? <span className="badge badge--navy">Super Admin</span>
-                      : <span className="badge badge--default">See detail</span>}
+                    {u.is_super_admin ? (
+                      <span className="badge badge--navy">Super Admin</span>
+                    ) : u.companyRoles?.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        {u.companyRoles.map((cr) => (
+                          <span key={cr.id} style={{ fontSize: '0.75rem' }}>
+                            <span className="text-muted">{cr.company?.short_name ?? '—'}:</span>{' '}
+                            <strong style={{ textTransform: 'capitalize' }}>{cr.role}</strong>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-muted" style={{ fontSize: '0.75rem' }}>No role assigned</span>
+                    )}
                   </td>
                   <td><span className={`badge badge--${u.is_active ? 'success' : 'muted'}`}>{u.is_active ? 'Active' : 'Inactive'}</span></td>
                   <td style={{ fontSize: '0.75rem' }}>{u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>

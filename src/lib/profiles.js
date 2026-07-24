@@ -11,6 +11,16 @@ export async function fetchProfiles() {
   return data;
 }
 
+// ─── List all company_users (super_admin sees all; admin sees own company) ──
+export async function fetchAllCompanyUsers() {
+  const { data, error } = await supabase
+    .schema('registry')
+    .from('company_users')
+    .select('id, user_id, company_id, role, company:companies(id, name, short_name, code)');
+  if (error) throw error;
+  return data ?? [];
+}
+
 // ─── Get single profile ──────────────────────────────────
 export async function fetchProfile(userId) {
   const { data, error } = await supabase
