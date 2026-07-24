@@ -1,13 +1,29 @@
 import { supabase } from './supabase';
 
 // ─── Write audit log entry ───────────────────────────────
-export async function writeAuditLog({ companyId, action, tableName, recordId, oldData, newData }) {
+// Map semantic caller actions to the values accepted by the DB CHECK constraint.
+const ACTION_MAP = {
+  create:         'INSERT',
+  insert:         'INSERT',
+  update:         'UPDATE',
+  upsert:         'UPDATE',
+  activate:       'UPDATE',
+  deactivate:     'UPDATE',
+  set_password:   'UPDATE',
+  invite:         'INSERT',
+  assign_company: 'INSERT',
+  remove_company: 'DELETE',
+};
+
+export async function writeAuditLog({ companyId, schemaName = 'registry', action, tableName, recordId, oldData, newData }) {
+  const dbAction = ACTION_MAP[action] ?? action.toUpperCase();
   const { error } = await supabase
     .schema('registry')
     .from('audit_log')
     .insert({
       company_id: companyId,
-      action,
+      schema_name: schemaName,
+      action: dbAction,
       table_name: tableName,
       record_id: recordId,
       old_data: oldData || null,
