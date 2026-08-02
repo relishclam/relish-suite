@@ -1627,6 +1627,11 @@
   padding: 1.25rem 0;
   display: flex;
   flex-direction: column;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  max-height: 100vh;
+  overflow-y: auto;
 }
 .md-sidebar__title {
   font-family: var(--font-heading);
