@@ -149,7 +149,7 @@ export default function UserManagement() {
     if (!selectedUser || !defaultPassword.trim()) return;
     setSaving(true);
     try {
-      await setUserDefaultPassword(selectedUser.id, defaultPassword.trim(), selectedUser.email, form.full_name || selectedUser.full_name || '');
+      await setUserDefaultPassword(selectedUser.id, defaultPassword.trim());
       writeAuditLog({ action: 'set_password', tableName: 'profiles', recordId: selectedUser.id });
       addToast('Password updated', 'success');
       setDefaultPassword('');
