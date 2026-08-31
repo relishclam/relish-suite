@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getSession } from '../lib/auth';
+import { loadWebAuthnCredId, storeWebAuthnCredId } from '../lib/webauthn';
 
 interface SignatureRecord {
   id: string;
@@ -16,20 +17,46 @@ export default function History() {
   const navigate = useNavigate();
   const [signatures, setSignatures] = useState<SignatureRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  // null = checking, true = ok, false = passkey missing
+  const [passkeyOk, setPasskeyOk] = useState<boolean | null>(null);
 
   useEffect(() => {
     async function loadHistory() {
       const session = await getSession();
       if (!session) { navigate('/login', { replace: true }); return; }
 
-      const { data } = await supabase
-        .from('document_signatures')
-        .select('id, seal_id, document_name, signed_at, source_app, sealed_doc_path')
-        .eq('signer_user_id', session.user.id)
-        .order('signed_at', { ascending: false })
-        .limit(50);
+      const [sigResult, keyResult] = await Promise.all([
+        supabase
+          .from('document_signatures')
+          .select('id, seal_id, document_name, signed_at, source_app, sealed_doc_path')
+          .eq('signer_user_id', session.user.id)
+          .order('signed_at', { ascending: false })
+          .limit(50),
+        supabase
+          .from('signing_keys')
+          .select('id, webauthn_credential_id')
+          .eq('user_id', session.user.id)
+          .is('revoked_at', null)
+          .order('enrolled_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
-      setSignatures(data ?? []);
+      setSignatures(sigResult.data ?? []);
+
+      const keyRow = keyResult.data;
+      if (!keyRow) {
+        // No signing key at all — needs full enrollment
+        setPasskeyOk(false);
+      } else if (keyRow.webauthn_credential_id) {
+        // Backfill localStorage if missing (e.g. enrolled before this fix)
+        if (!loadWebAuthnCredId()) storeWebAuthnCredId(keyRow.webauthn_credential_id);
+        setPasskeyOk(true);
+      } else {
+        // Key exists but passkey was never registered
+        setPasskeyOk(false);
+      }
+
       setLoading(false);
     }
     loadHistory();
@@ -62,6 +89,26 @@ export default function History() {
         <img src="/Relish-Logo.png" alt="Relish" className="h-8" />
         <span className="text-sm font-semibold text-relish-purple">Relish Sign</span>
       </div>
+
+      {/* Setup incomplete banner */}
+      {passkeyOk === false && (
+        <div className="mx-4 mt-4 bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex items-start gap-3">
+          <span className="text-xl mt-0.5">⚠️</span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-800">Biometric setup incomplete</p>
+            <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+              Your signing key exists but your device passkey was not saved.
+              Tap Fix to complete setup — takes 10 seconds.
+            </p>
+            <button
+              onClick={() => navigate('/enroll')}
+              className="mt-2 bg-amber-500 text-white rounded-lg px-4 py-1.5 text-xs font-semibold"
+            >
+              Fix Now →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Primary action — Sign a Document */}
       <div className="px-4 pt-4">

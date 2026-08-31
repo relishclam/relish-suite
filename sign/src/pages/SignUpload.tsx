@@ -8,6 +8,7 @@ import { uploadQuickSign, stampAndUpload } from '../lib/storage';
 import { renderSeal } from '../lib/seal';
 import { isMobileDevice } from '../lib/device';
 import SealPreview from '../components/SealPreview';
+import { loadWebAuthnCredId } from '../lib/webauthn';
 
 const APP_ORIGIN = import.meta.env.VITE_APP_ORIGIN ?? 'https://sign.relishfoods.co';
 const MAX_SIZE = 20 * 1024 * 1024;
@@ -143,7 +144,7 @@ export default function SignUpload() {
       // Biometric gate — fires before any upload or signing
       let authPassed = false;
       try {
-        authPassed = await requestBiometricAuth();
+        authPassed = await requestBiometricAuth(loadWebAuthnCredId());
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Authentication failed');
         setStep('review');

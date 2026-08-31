@@ -1,4 +1,5 @@
 /** All Web Crypto operations for Relish Sign. Private key never leaves the device. */
+import { RELISH_SIGN_RP_ID } from './webauthn';
 
 function hexToBytes(hex: string): ArrayBuffer {
   const buffer = new ArrayBuffer(hex.length / 2);
@@ -65,8 +66,9 @@ export async function hashFile(file: File | ArrayBuffer): Promise<string> {
 /**
  * Prompts device biometric/PIN via WebAuthn before signing.
  * Must be called and must return true before signHash() is ever invoked.
+ * Pass credentialIdB64 (base64 rawId from enrollment) to target the specific passkey.
  */
-export async function requestBiometricAuth(): Promise<boolean> {
+export async function requestBiometricAuth(credentialIdB64?: string | null): Promise<boolean> {
   try {
     if (!window.PublicKeyCredential) {
       return confirm('Confirm your identity to sign this document.');
@@ -86,12 +88,21 @@ export async function requestBiometricAuth(): Promise<boolean> {
     const challenge = new Uint8Array(32);
     window.crypto.getRandomValues(challenge);
 
+    const allowCredentials: PublicKeyCredentialDescriptor[] = credentialIdB64
+      ? [{
+          type: 'public-key' as const,
+          id: Uint8Array.from(atob(credentialIdB64), (c) => c.charCodeAt(0)),
+          transports: ['internal'] as AuthenticatorTransport[],
+        }]
+      : [];
+
     await navigator.credentials.get({
       publicKey: {
         challenge,
         timeout: 60000,
         userVerification: 'required',
-        rpId: window.location.hostname,
+        rpId: RELISH_SIGN_RP_ID,
+        ...(allowCredentials.length > 0 ? { allowCredentials } : {}),
       },
     });
 

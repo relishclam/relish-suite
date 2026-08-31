@@ -110,7 +110,12 @@ export async function inviteUser(email, fullName, companyId, role) {
   const { data, error } = await supabase.functions.invoke('invite-user', {
     body: { email, fullName, companyId, role },
   });
-  if (error) throw error;
+  if (error) {
+    // FunctionsHttpError.context is the raw Response — surface the real message
+    let msg = error.message;
+    try { const b = await error.context?.json(); if (b?.error) msg = b.error; } catch {}
+    throw new Error(msg);
+  }
   if (data?.error) throw new Error(data.error);
   return data;
 }
@@ -119,7 +124,11 @@ export async function setUserDefaultPassword(userId, password) {
   const { data, error } = await supabase.functions.invoke('invite-user', {
     body: { userId, password },
   });
-  if (error) throw error;
+  if (error) {
+    let msg = error.message;
+    try { const b = await error.context?.json(); if (b?.error) msg = b.error; } catch {}
+    throw new Error(msg);
+  }
   if (data?.error) throw new Error(data.error);
   return data;
 }

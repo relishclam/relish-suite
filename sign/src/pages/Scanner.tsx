@@ -9,10 +9,14 @@ const EXPLAINER_KEY = 'hasSeenScanExplainer';
 function CameraView() {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [camError, setCamError] = useState<string | null>(null);
 
   useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
     const reader = new BrowserMultiFormatReader();
-    reader.decodeFromVideoDevice(undefined, videoRef.current!, (result, _err, controls) => {
+    let stopped = false;
+    reader.decodeFromVideoDevice(undefined, el, (result, _err, controls) => {
       if (!result) return;
       const text = result.getText();
       let requestId: string | null = null;
@@ -21,14 +25,36 @@ function CameraView() {
       } else if (/^[0-9a-f-]{36}$/.test(text)) {
         requestId = text;
       }
-      if (requestId) { controls.stop(); navigate(`/scan/${requestId}`); }
+      if (requestId && !stopped) { stopped = true; controls.stop(); navigate(`/scan/${requestId}`); }
+    }).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('denied')) {
+        setCamError('Camera permission denied. Please allow camera access in your browser settings and try again.');
+      } else if (msg.toLowerCase().includes('notfound') || msg.toLowerCase().includes('no camera')) {
+        setCamError('No camera found on this device.');
+      } else {
+        setCamError('Could not open camera. Make sure the app is opened over HTTPS and camera permission is granted.');
+      }
     });
+    return () => { stopped = true; };
   }, [navigate]);
+
+  if (camError) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center px-8 text-center gap-4">
+        <span className="text-4xl">📷</span>
+        <p className="text-white text-sm leading-relaxed">{camError}</p>
+        <button onClick={() => navigate(-1)} className="mt-2 text-relish-teal text-sm underline">
+          Go Back
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center">
       <div className="relative w-full max-w-sm aspect-square">
-        <video ref={videoRef} className="w-full h-full object-cover rounded-xl" muted playsInline />
+        <video ref={videoRef} className="w-full h-full object-cover rounded-xl" muted playsInline autoPlay />
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-56 h-56 border-2 border-relish-teal rounded-xl opacity-80" />
         </div>

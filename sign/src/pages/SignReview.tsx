@@ -7,6 +7,7 @@ import { signHash, requestBiometricAuth } from '../lib/crypto';
 import { renderSeal } from '../lib/seal';
 import { stampAndUpload } from '../lib/storage';
 import { getCurrentUserName } from '../lib/auth';
+import { loadWebAuthnCredId } from '../lib/webauthn';
 
 interface SigningRequest {
   id: string;
@@ -96,7 +97,7 @@ export default function SignReview() {
       // Biometric gate — must pass before private key is loaded
       let authPassed = false;
       try {
-        authPassed = await requestBiometricAuth();
+        authPassed = await requestBiometricAuth(loadWebAuthnCredId());
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Authentication failed');
         setSigning(false);
