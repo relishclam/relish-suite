@@ -87,8 +87,8 @@ export async function renderSeal(data: SealData): Promise<Blob> {
   ctx.textAlign = 'center';
   ctx.fillText(data.signerName.toUpperCase(), W / 2, 80);
 
-  // "Digitally Signed" — Teal (mandatory, replaces role)
-  ctx.fillStyle = '#2DD4BF';
+  // "Digitally Signed" — Black
+  ctx.fillStyle = '#000000';
   ctx.font = '11px "DM Sans", Arial, sans-serif';
   ctx.fillText('Digitally Signed', W / 2, 96);
 
