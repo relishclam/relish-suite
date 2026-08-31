@@ -117,7 +117,11 @@ export default function Enroll() {
 
       setStep('done');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Enrollment failed');
+      // DOMException (WebAuthn errors) has name + message but may not pass instanceof Error
+      const e = err as { name?: string; message?: string };
+      const msg = e.message ?? String(err) ?? 'Unknown error';
+      const label = e.name ? `${e.name}: ${msg}` : msg;
+      setError(label);
       setStep('name-device');
     }
   }
