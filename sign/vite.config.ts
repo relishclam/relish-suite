@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['Relish-Logo.png', 'icon-192.png', 'icon-512.png'],
+      includeAssets: ['Relish-Logo.png', 'icon-192.png'],
       manifest: false, // using public/manifest.json directly
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
