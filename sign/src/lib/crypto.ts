@@ -61,3 +61,46 @@ export async function hashFile(file: File | ArrayBuffer): Promise<string> {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
+
+/**
+ * Prompts device biometric/PIN via WebAuthn before signing.
+ * Must be called and must return true before signHash() is ever invoked.
+ */
+export async function requestBiometricAuth(): Promise<boolean> {
+  try {
+    if (!window.PublicKeyCredential) {
+      return confirm('Confirm your identity to sign this document.');
+    }
+
+    const available = await PublicKeyCredential
+      .isUserVerifyingPlatformAuthenticatorAvailable();
+
+    if (!available) {
+      throw new Error(
+        'Your device has no screen lock set up. ' +
+        'Please enable Face ID, fingerprint, or PIN in device settings ' +
+        'before using Relish Sign.',
+      );
+    }
+
+    const challenge = new Uint8Array(32);
+    window.crypto.getRandomValues(challenge);
+
+    await navigator.credentials.get({
+      publicKey: {
+        challenge,
+        timeout: 60000,
+        userVerification: 'required',
+        rpId: window.location.hostname,
+      },
+    });
+
+    return true;
+  } catch (err: unknown) {
+    const e = err as { name?: string; message?: string };
+    if (e.message?.includes('screen lock')) throw err; // propagate setup error
+    if (e.name === 'NotAllowedError') return false;    // user cancelled
+    console.error('Biometric auth error:', err);
+    return false;
+  }
+}

@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { renderSeal } from './seal';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 const BUCKET = 'relish-sign-docs';
 
@@ -91,8 +91,36 @@ export async function stampPDF(pdfBytes: ArrayBuffer, sealBlob: Blob): Promise<U
   const pages = pdfDoc.getPages();
   const lastPage = pages[pages.length - 1];
   const { width } = lastPage.getSize();
+
+  // Seal — bottom-right corner
   const x = width - SEAL_W_PT - SEAL_MARGIN_PT;
   lastPage.drawImage(sealImage, { x, y: SEAL_MARGIN_PT, width: SEAL_W_PT, height: SEAL_H_PT });
+
+  // Faint disclaimer footer at very bottom of page
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  lastPage.drawLine({
+    start: { x: 0, y: 30 }, end: { x: width, y: 30 },
+    thickness: 0.5,
+    color: rgb(0.847, 0.706, 0.996),
+    opacity: 0.6,
+  });
+  lastPage.drawText(
+    'This document bears a Relish Group Internal Digital Signature.  ' +
+    'For internal verification purposes only.  ' +
+    'Not a legally recognised Digital Signature Certificate ' +
+    'under the Information Technology Act, 2000.  ' +
+    'Not intended for external or legal use.',
+    {
+      x: 20, y: 16,
+      size: 7,
+      font,
+      color: rgb(0.769, 0.710, 0.992),
+      opacity: 0.55,
+      maxWidth: width - 40,
+      lineHeight: 9,
+    },
+  );
+
   return pdfDoc.save();
 }
 
@@ -114,6 +142,20 @@ function stampImage(imageBytes: ArrayBuffer, sealBlob: Blob): Promise<Blob> {
         const x = canvas.width - SEAL_W_PX - SEAL_MARGIN_PX;
         const y = canvas.height - SEAL_H_PX - SEAL_MARGIN_PX;
         ctx.drawImage(sealImg, x, y, SEAL_W_PX, SEAL_H_PX);
+
+        // Faint disclaimer strip at very bottom
+        ctx.save();
+        ctx.globalAlpha = 0.30;
+        ctx.fillStyle = '#C4B5FD';
+        ctx.font = '11px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(
+          'Relish Group Internal Digital Signature · Internal use only · Not a legally recognised DSC under IT Act 2000',
+          canvas.width / 2,
+          canvas.height - 6,
+        );
+        ctx.restore();
+
         URL.revokeObjectURL(sealUrl);
         canvas.toBlob(
           (blob) => (blob ? resolve(blob) : reject(new Error('Canvas toBlob failed'))),

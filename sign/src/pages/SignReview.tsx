@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getSession } from '../lib/auth';
 import { loadPrivateKey } from '../lib/indexeddb';
-import { signHash } from '../lib/crypto';
+import { signHash, requestBiometricAuth } from '../lib/crypto';
 import { renderSeal } from '../lib/seal';
 import { stampAndUpload } from '../lib/storage';
 import { getCurrentUserName } from '../lib/auth';
@@ -93,8 +93,23 @@ export default function SignReview() {
       const session = await getSession();
       if (!session) throw new Error('Not authenticated');
 
+      // Biometric gate — must pass before private key is loaded
+      let authPassed = false;
+      try {
+        authPassed = await requestBiometricAuth();
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Authentication failed');
+        setSigning(false);
+        return;
+      }
+      if (!authPassed) {
+        setError('Authentication cancelled. Document not signed.');
+        setSigning(false);
+        return;
+      }
+
       const privateKey = await loadPrivateKey();
-      if (!privateKey) throw new Error('No signing key found on this device. Please re-enroll.');
+      if (!privateKey) throw new Error('No signing key found on this device. Please re-enrol.');
 
       // Retrieve active signing_key row for the key id
       const { data: keyRow } = await supabase
@@ -234,7 +249,8 @@ export default function SignReview() {
   return (
     <div className="min-h-screen flex flex-col bg-white">
       {/* Header */}
-      <div className="flex items-center justify-center py-5 border-b border-gray-100">
+      <div className="flex items-center gap-3 px-4 py-5 border-b border-gray-100">
+        <button onClick={() => navigate(-1)} className="text-gray-400 text-xl leading-none">←</button>
         <img src="/Relish-Logo.png" alt="Relish" className="h-8" />
       </div>
 

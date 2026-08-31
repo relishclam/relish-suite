@@ -20,6 +20,9 @@ export default function SignSuccess() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white px-6 text-center">
+      <div className="w-full flex items-center gap-3 px-0 pb-6">
+        <button onClick={() => navigate('/history')} className="text-gray-400 text-xl leading-none">←</button>
+      </div>
       <img src="/Relish-Logo.png" alt="Relish" className="h-10 mb-6" />
 
       <div className="w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center mb-4">

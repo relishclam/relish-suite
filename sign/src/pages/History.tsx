@@ -1,9 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getSession } from '../lib/auth';
-import { hashFile } from '../lib/crypto';
-import { uploadQuickSign } from '../lib/storage';
 
 interface SignatureRecord {
   id: string;
@@ -18,8 +16,6 @@ export default function History() {
   const navigate = useNavigate();
   const [signatures, setSignatures] = useState<SignatureRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [quickSignLoading, setQuickSignLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function loadHistory() {
@@ -45,48 +41,10 @@ export default function History() {
     setDownloading(sigId);
     const { data, error } = await supabase.storage
       .from('relish-sign-docs')
-      .createSignedUrl(sealedDocPath, 60);
+      .createSignedUrl(sealedDocPath, 300);
     setDownloading(null);
     if (error || !data) { alert('Could not generate download link'); return; }
     window.open(data.signedUrl, '_blank');
-  }
-
-  async function handleQuickSign(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setQuickSignLoading(true);
-
-    try {
-      const session = await getSession();
-      if (!session) throw new Error('Not authenticated');
-
-      const documentHash = await hashFile(file);
-      const documentPath = await uploadQuickSign(file, session.user.id);
-
-      const docType = file.type === 'application/pdf' ? 'pdf' : 'image';
-
-      const { data, error } = await supabase
-        .from('signing_requests')
-        .insert({
-          signer_user_id: session.user.id,
-          requested_by: session.user.id,
-          document_path: documentPath,
-          document_hash: documentHash,
-          document_name: file.name,
-          document_type: docType,
-          source_app: 'relish-sign',
-          source_record_id: null,
-        })
-        .select('id')
-        .single();
-
-      if (error || !data) throw error ?? new Error('Failed to create signing request');
-
-      navigate(`/scan/${data.id}`);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Quick Sign failed');
-      setQuickSignLoading(false);
-    }
   }
 
   const appLabels: Record<string, string> = {
@@ -94,7 +52,7 @@ export default function History() {
     suite: 'Suite',
     clamflow: 'ClamFlow',
     approvals: 'Approvals',
-    'relish-sign': 'Quick Sign',
+    'relish-sign': 'Sign a Document',
   };
 
   return (
@@ -105,39 +63,25 @@ export default function History() {
         <span className="text-sm font-semibold text-relish-purple">Relish Sign</span>
       </div>
 
-      {/* Quick Sign FAB */}
+      {/* Primary action — Sign a Document */}
       <div className="px-4 pt-4">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/pdf,image/jpeg,image/png"
-          className="hidden"
-          onChange={handleQuickSign}
-        />
         <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={quickSignLoading}
-          className="w-full bg-relish-purple text-white rounded-xl py-4 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+          onClick={() => navigate('/upload')}
+          className="w-full bg-relish-purple text-white rounded-xl py-5 font-semibold text-lg flex flex-col items-center gap-1"
         >
-          {quickSignLoading ? (
-            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <span className="text-lg">＋</span>
-          )}
-          Quick Sign
+          <span>+ Sign a Document</span>
+          <span className="text-sm font-normal opacity-80">Upload and sign any file</span>
         </button>
-        <p className="text-xs text-center text-gray-400 mt-2">
-          Sign a PDF or image directly from this device
-        </p>
       </div>
 
-      {/* Scanner entry */}
+      {/* Secondary action — Scan QR */}
       <div className="px-4 pt-3">
         <button
           onClick={() => navigate('/scanner')}
-          className="w-full border border-relish-purple text-relish-purple rounded-xl py-3 font-semibold text-sm flex items-center justify-center gap-2"
+          className="w-full border border-relish-purple text-relish-purple rounded-xl py-4 font-semibold text-sm flex flex-col items-center gap-0.5"
         >
-          <span>📷</span> Scan QR Code
+          <span>📷 Scan QR Code</span>
+          <span className="text-xs font-normal opacity-70">Sign a document requested by another Relish app</span>
         </button>
       </div>
 

@@ -41,12 +41,48 @@ export default function Enroll() {
       // Store private key in IndexedDB before any network call
       await storePrivateKey(privateKey);
 
+      // Register WebAuthn credential — ties DSC to this device's biometric/PIN
+      let webauthnCredentialId: string | null = null;
+      try {
+        const challenge = new Uint8Array(32);
+        window.crypto.getRandomValues(challenge);
+        const credential = await navigator.credentials.create({
+          publicKey: {
+            challenge,
+            rp: { name: 'Relish Sign', id: window.location.hostname },
+            user: {
+              id: new TextEncoder().encode(session.user.id),
+              name: session.user.email ?? userName,
+              displayName: userName,
+            },
+            pubKeyCredParams: [
+              { alg: -7,   type: 'public-key' as const },
+              { alg: -257, type: 'public-key' as const },
+            ],
+            authenticatorSelection: {
+              authenticatorAttachment: 'platform' as const,
+              userVerification: 'required' as const,
+              residentKey: 'preferred' as const,
+            },
+            timeout: 60000,
+          },
+        }) as PublicKeyCredential | null;
+        if (credential) {
+          webauthnCredentialId = btoa(
+            String.fromCharCode(...new Uint8Array(credential.rawId))
+          );
+        }
+      } catch (webauthnErr) {
+        console.warn('WebAuthn registration skipped:', webauthnErr);
+      }
+
       const { data, error: insertError } = await supabase
         .from('signing_keys')
         .insert({
           user_id: session.user.id,
           display_name: deviceName.trim() || 'My Device',
           public_key_jwk: publicKeyJwk,
+          webauthn_credential_id: webauthnCredentialId,
         })
         .select('id')
         .single();
