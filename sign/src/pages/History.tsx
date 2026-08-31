@@ -11,6 +11,7 @@ interface SignatureRecord {
   document_name: string;
   signed_at: string;
   source_app: string;
+  sealed_doc_path: string | null;
 }
 
 export default function History() {
@@ -27,7 +28,7 @@ export default function History() {
 
       const { data } = await supabase
         .from('document_signatures')
-        .select('id, seal_id, document_name, signed_at, source_app')
+        .select('id, seal_id, document_name, signed_at, source_app, sealed_doc_path')
         .eq('signer_user_id', session.user.id)
         .order('signed_at', { ascending: false })
         .limit(50);
@@ -37,6 +38,18 @@ export default function History() {
     }
     loadHistory();
   }, [navigate]);
+
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  async function handleDownload(sealedDocPath: string, sigId: string) {
+    setDownloading(sigId);
+    const { data, error } = await supabase.storage
+      .from('relish-sign-docs')
+      .createSignedUrl(sealedDocPath, 60);
+    setDownloading(null);
+    if (error || !data) { alert('Could not generate download link'); return; }
+    window.open(data.signedUrl, '_blank');
+  }
 
   async function handleQuickSign(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -154,13 +167,26 @@ export default function History() {
                     {appLabels[sig.source_app] ?? sig.source_app}
                   </span>
                 </div>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {new Date(sig.signed_at).toLocaleString('en-IN', {
-                    timeZone: 'Asia/Kolkata',
-                    day: '2-digit', month: 'short', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit', hour12: false,
-                  })} IST
-                </p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs text-gray-400">
+                    {new Date(sig.signed_at).toLocaleString('en-IN', {
+                      timeZone: 'Asia/Kolkata',
+                      day: '2-digit', month: 'short', year: 'numeric',
+                      hour: '2-digit', minute: '2-digit', hour12: false,
+                    })} IST
+                  </p>
+                  {sig.sealed_doc_path ? (
+                    <button
+                      onClick={() => handleDownload(sig.sealed_doc_path!, sig.id)}
+                      disabled={downloading === sig.id}
+                      className="text-xs text-relish-purple font-medium underline disabled:opacity-50"
+                    >
+                      {downloading === sig.id ? 'Preparing…' : '⬇ Download Sealed'}
+                    </button>
+                  ) : (
+                    <span className="text-xs text-gray-300">Sealing…</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>

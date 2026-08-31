@@ -5,7 +5,7 @@ import { getSession } from '../lib/auth';
 import { loadPrivateKey } from '../lib/indexeddb';
 import { signHash } from '../lib/crypto';
 import { renderSeal } from '../lib/seal';
-import { uploadSeal, stampAndUpload } from '../lib/storage';
+import { stampAndUpload } from '../lib/storage';
 import { getCurrentUserName } from '../lib/auth';
 
 interface SigningRequest {
@@ -146,30 +146,7 @@ export default function SignReview() {
       await supabase.from('signing_keys').update({ last_used_at: signedAt.toISOString() })
         .eq('id', keyRow.id);
 
-      // Render and upload seal
-      const sealBlob = await renderSeal({
-        signerName,
-        sealId: sigRecord.seal_id,
-        signedAt,
-      });
-      const sealPath = await uploadSeal(sealBlob, sigRecord.id);
-
-      // Stamp PDF if applicable
-      let sealedPath: string | null = null;
-      if (request.document_type === 'pdf') {
-        try {
-          sealedPath = await stampAndUpload(request.document_path, sealBlob, sigRecord.id);
-        } catch {
-          // Non-fatal — seal image uploaded, PDF stamp failed
-        }
-      }
-
-      // Update signature row with asset paths
-      await supabase.from('document_signatures').update({
-        seal_image_path: sealPath,
-        ...(sealedPath ? { sealed_doc_path: sealedPath } : {}),
-      }).eq('id', sigRecord.id);
-
+      // Navigate to success immediately — stamp continues in background
       navigate('/sign-success', {
         replace: true,
         state: {
@@ -179,6 +156,33 @@ export default function SignReview() {
           signedAt: signedAt.toISOString(),
         },
       });
+
+      // Background: render seal + stamp document + update DB, retry once on failure
+      const capturedId = sigRecord.id;
+      const capturedSealId = sigRecord.seal_id;
+      const capturedUserId = session.user.id;
+      const capturedRequest = request;
+      ;(async function doStamp(attempt: number) {
+        try {
+          const sealBlob = await renderSeal({ signerName, sealId: capturedSealId, signedAt });
+          const result = await stampAndUpload({
+            documentPath: capturedRequest.document_path,
+            documentName: capturedRequest.document_name,
+            documentType: capturedRequest.document_type as 'pdf' | 'image' | 'generated',
+            sealBlob,
+            signatureId: capturedId,
+            userId: capturedUserId,
+            sealId: capturedSealId,
+          });
+          await supabase.from('document_signatures').update({
+            seal_image_path: result.sealPath,
+            sealed_doc_path: result.sealedPath,
+          }).eq('id', capturedId);
+        } catch (err) {
+          console.error(`Seal stamp attempt ${attempt + 1} failed:`, err);
+          if (attempt === 0) setTimeout(() => doStamp(1), 3000);
+        }
+      })(0);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signing failed');
       setSigning(false);
