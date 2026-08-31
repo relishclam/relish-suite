@@ -6,6 +6,7 @@ import { hashFile, requestBiometricAuth, signHash } from '../lib/crypto';
 import { loadPrivateKey } from '../lib/indexeddb';
 import { uploadQuickSign, stampAndUpload } from '../lib/storage';
 import { renderSeal } from '../lib/seal';
+import { isMobileDevice } from '../lib/device';
 import SealPreview from '../components/SealPreview';
 
 const APP_ORIGIN = import.meta.env.VITE_APP_ORIGIN ?? 'https://sign.relishfoods.co';
@@ -58,6 +59,81 @@ export default function SignUpload() {
   }
 
   async function handleSign() {
+    if (!selectedFile) return;
+    setError(null);
+    // Desktop always uses QR flow — private key lives on enrolled phone only
+    const privateKey = await loadPrivateKey();
+    if (privateKey && isMobileDevice()) {
+      await doMobileSign();
+    } else {
+      await doDesktopSign();
+    }
+  }
+
+  async function doDesktopSign() {
+    if (!selectedFile) return;
+    setStep('processing');
+    setProcessingStatus('Uploading…');
+    try {
+      const session = await getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      // Verify user has at least one enrolled device before uploading
+      const { data: keys } = await supabase
+        .from('signing_keys')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .is('revoked_at', null)
+        .limit(1);
+
+      if (!keys || keys.length === 0) {
+        setError(
+          'You have not enrolled a signing device yet. ' +
+          'Open Relish Sign on your phone to enrol.',
+        );
+        setStep('review');
+        return;
+      }
+
+      const documentHash = await hashFile(selectedFile);
+      const docType: 'pdf' | 'image' = selectedFile.type === 'application/pdf' ? 'pdf' : 'image';
+      const documentPath = await uploadQuickSign(selectedFile, session.user.id);
+
+      const { data, error } = await supabase
+        .from('signing_requests')
+        .insert({
+          signer_user_id: session.user.id,
+          requested_by: session.user.id,
+          document_path: documentPath,
+          document_hash: documentHash,
+          document_name: selectedFile.name,
+          document_type: docType,
+          source_app: 'relish-sign',
+          source_record_id: null,
+        })
+        .select('id, expires_at')
+        .single();
+
+      if (error || !data) throw error ?? new Error('Failed to create signing request');
+
+      navigate('/desktop-qr', {
+        state: {
+          requestId: data.id,
+          documentPath,
+          documentHash,
+          documentName: selectedFile.name,
+          documentType: docType,
+          expiresAt: data.expires_at,
+          originalFileName: selectedFile.name,
+        },
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+      setStep('review');
+    }
+  }
+
+  async function doMobileSign() {
     if (!selectedFile) return;
     setError(null);
     setStep('processing');

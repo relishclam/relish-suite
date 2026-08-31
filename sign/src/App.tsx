@@ -6,6 +6,7 @@ import Scanner from './pages/Scanner';
 import SignReview from './pages/SignReview';
 import SignSuccess from './pages/SignSuccess';
 import History from './pages/History';
+import DesktopQR from './pages/DesktopQR';
 import SignUpload from './pages/SignUpload';
 import Verify from './pages/Verify';
 
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/history" replace />} />
           <Route path="/history" element={<History />} />
           <Route path="/upload" element={<SignUpload />} />
+          <Route path="/desktop-qr" element={<DesktopQR />} />
           <Route path="/enroll" element={<Enroll />} />
           <Route path="/scanner" element={<Scanner />} />
           <Route path="/scan/:requestId" element={<SignReview />} />
