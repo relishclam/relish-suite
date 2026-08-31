@@ -55,40 +55,66 @@ export default function Enroll() {
       const session = await getSession();
       if (!session) throw new Error('Not authenticated');
 
-      // Register WebAuthn credential — ties DSC to this device's biometric/PIN
-      const challenge = new Uint8Array(32);
-      window.crypto.getRandomValues(challenge);
-      const credential = await navigator.credentials.create({
-        publicKey: {
-          challenge,
-          rp: { name: 'Relish Sign', id: RELISH_SIGN_RP_ID },
-          user: {
-            id: new TextEncoder().encode(session.user.id),
-            name: session.user.email ?? userName,
-            displayName: userName,
-          },
-          pubKeyCredParams: [
-            { alg: -7,   type: 'public-key' as const },
-            { alg: -257, type: 'public-key' as const },
-          ],
-          authenticatorSelection: {
-            authenticatorAttachment: 'platform' as const,
-            userVerification: 'required' as const,
-            residentKey: 'preferred' as const,
-          },
-          timeout: 60000,
-        },
-      }) as PublicKeyCredential | null;
-
-      if (!credential) throw new Error('Passkey creation was cancelled. Please try again.');
-
-      const webauthnCredentialId = btoa(
-        String.fromCharCode(...new Uint8Array(credential.rawId))
-      );
-      storeWebAuthnCredId(webauthnCredentialId);
+      let webauthnCredentialId: string;
 
       if (repairKeyId) {
-        // Repair mode — update existing key row, skip key generation
+        // Repair mode — passkey may already exist in password manager but not in Supabase.
+        // Try to authenticate with an existing passkey for this RP first.
+        const existingCred = await (async () => {
+          try {
+            const challenge = new Uint8Array(32);
+            window.crypto.getRandomValues(challenge);
+            const assertion = await navigator.credentials.get({
+              publicKey: {
+                challenge,
+                timeout: 30000,
+                userVerification: 'required',
+                rpId: RELISH_SIGN_RP_ID,
+              },
+            }) as PublicKeyCredential | null;
+            return assertion;
+          } catch {
+            return null;
+          }
+        })();
+
+        if (existingCred) {
+          // Found an existing passkey — save its ID, no need to create a new one
+          webauthnCredentialId = btoa(
+            String.fromCharCode(...new Uint8Array(existingCred.rawId))
+          );
+        } else {
+          // No existing passkey found — create a new one
+          const challenge = new Uint8Array(32);
+          window.crypto.getRandomValues(challenge);
+          const credential = await navigator.credentials.create({
+            publicKey: {
+              challenge,
+              rp: { name: 'Relish Sign', id: RELISH_SIGN_RP_ID },
+              user: {
+                id: new TextEncoder().encode(session.user.id),
+                name: session.user.email ?? userName,
+                displayName: userName,
+              },
+              pubKeyCredParams: [
+                { alg: -7,   type: 'public-key' as const },
+                { alg: -257, type: 'public-key' as const },
+              ],
+              authenticatorSelection: {
+                authenticatorAttachment: 'platform' as const,
+                userVerification: 'required' as const,
+                residentKey: 'preferred' as const,
+              },
+              timeout: 60000,
+            },
+          }) as PublicKeyCredential | null;
+          if (!credential) throw new Error('Passkey creation was cancelled. Please try again.');
+          webauthnCredentialId = btoa(
+            String.fromCharCode(...new Uint8Array(credential.rawId))
+          );
+        }
+
+        storeWebAuthnCredId(webauthnCredentialId);
         const { error: updateErr } = await supabase
           .from('signing_keys')
           .update({ webauthn_credential_id: webauthnCredentialId })
@@ -96,7 +122,36 @@ export default function Enroll() {
         if (updateErr) throw updateErr;
         setSealId(`RSG-0001 · ${repairKeyId.slice(0, 8)}`);
       } else {
-        // Full enrollment — generate new ECDSA key pair
+        // Full enrollment — register WebAuthn credential then generate ECDSA key pair
+        const challenge = new Uint8Array(32);
+        window.crypto.getRandomValues(challenge);
+        const credential = await navigator.credentials.create({
+          publicKey: {
+            challenge,
+            rp: { name: 'Relish Sign', id: RELISH_SIGN_RP_ID },
+            user: {
+              id: new TextEncoder().encode(session.user.id),
+              name: session.user.email ?? userName,
+              displayName: userName,
+            },
+            pubKeyCredParams: [
+              { alg: -7,   type: 'public-key' as const },
+              { alg: -257, type: 'public-key' as const },
+            ],
+            authenticatorSelection: {
+              authenticatorAttachment: 'platform' as const,
+              userVerification: 'required' as const,
+              residentKey: 'preferred' as const,
+            },
+            timeout: 60000,
+          },
+        }) as PublicKeyCredential | null;
+        if (!credential) throw new Error('Passkey creation was cancelled. Please try again.');
+        webauthnCredentialId = btoa(
+          String.fromCharCode(...new Uint8Array(credential.rawId))
+        );
+        storeWebAuthnCredId(webauthnCredentialId);
+
         const { publicKeyJwk, privateKey } = await generateKeyPair();
         await storePrivateKey(privateKey);
 
