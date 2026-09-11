@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/common/Toast';
-import { updateProfile } from '../lib/profiles';
+import { updateProfile, changeOwnPassword } from '../lib/profiles';
 
 export default function Settings() {
   const { profile, user, companies, activeCompany, activeRole, signOut } = useAuth();
   const addToast = useToast();
   const [name, setName] = useState(profile?.full_name || '');
   const [saving, setSaving] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
@@ -18,6 +22,29 @@ export default function Settings() {
       addToast(err.message, 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 8) {
+      addToast('New password must be at least 8 characters', 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      addToast('New password and confirmation do not match', 'error');
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await changeOwnPassword(user.email, currentPassword, newPassword);
+      addToast('Password changed successfully', 'success');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      addToast(err.message, 'error');
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -43,6 +70,52 @@ export default function Settings() {
         </div>
         <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
           <button type="button" className="btn btn-primary" disabled={saving} onClick={handleSave}>{saving ? 'Saving…' : 'Save'}</button>
+        </div>
+      </div>
+
+      <div className="card" style={{ maxWidth: 560, marginTop: '1.5rem' }}>
+        <h3 className="um-section__title">Change Password</h3>
+        <div className="po-form__grid">
+          <div className="form-group form-group--span2">
+            <label className="form-label">Current Password</label>
+            <input
+              type="password"
+              className="form-input"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">New Password</label>
+            <input
+              type="password"
+              className="form-input"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Confirm New Password</label>
+            <input
+              type="password"
+              className="form-input"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+          </div>
+        </div>
+        <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+            onClick={handleChangePassword}
+          >
+            {changingPassword ? 'Changing…' : 'Change Password'}
+          </button>
         </div>
       </div>
 
