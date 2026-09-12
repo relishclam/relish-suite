@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { getSession } from '../lib/auth';
 import { loadWebAuthnCredId, storeWebAuthnCredId } from '../lib/webauthn';
 import { loadPrivateKey } from '../lib/indexeddb';
+import { retroactiveStamp } from '../lib/storage';
 
 interface SignatureRecord {
   id: string;
@@ -65,6 +66,25 @@ export default function History() {
   }, [navigate]);
 
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<{ id: string; message: string } | null>(null);
+
+  async function handleRetrySeal(sealId: string, sigId: string) {
+    setRetrying(sigId);
+    setRetryError(null);
+    try {
+      await retroactiveStamp(sealId);
+      const { data } = await supabase
+        .from('document_signatures')
+        .select('id, seal_id, document_name, signed_at, source_app, sealed_doc_path')
+        .eq('id', sigId)
+        .single();
+      if (data) setSignatures((prev) => prev.map((s) => s.id === sigId ? data : s));
+    } catch (err) {
+      setRetryError({ id: sigId, message: err instanceof Error ? err.message : 'Retry failed' });
+    }
+    setRetrying(null);
+  }
 
   async function handleDownload(sealedDocPath: string, sigId: string) {
     setDownloading(sigId);
@@ -177,9 +197,18 @@ export default function History() {
                       {downloading === sig.id ? 'Preparing…' : '⬇ Download Sealed'}
                     </button>
                   ) : (
-                    <span className="text-xs text-gray-300">Sealing…</span>
+                    <button
+                      onClick={() => handleRetrySeal(sig.seal_id, sig.id)}
+                      disabled={retrying === sig.id}
+                      className="text-xs text-gray-400 underline disabled:opacity-50"
+                    >
+                      {retrying === sig.id ? 'Sealing…' : 'Retry Sealing'}
+                    </button>
                   )}
                 </div>
+                {retryError?.id === sig.id && (
+                  <p className="text-xs text-red-500 mt-1">{retryError.message}</p>
+                )}
               </div>
             ))}
           </div>

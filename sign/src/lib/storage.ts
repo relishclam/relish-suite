@@ -27,20 +27,21 @@ export interface StampResult {
   sealedPath: string;
 }
 
-export async function uploadFile(file: File | Blob, path: string): Promise<string> {
+export async function uploadFile(file: File | Blob, path: string, upsert = false): Promise<string> {
   const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
-    upsert: false,
+    upsert,
     contentType: file instanceof File ? file.type : 'application/octet-stream',
   });
   if (error) throw error;
   return path;
 }
 
-/** Uploads seal PNG to seals/{userId}/{sealId}.png */
+/** Uploads seal PNG to seals/{userId}/{sealId}.png. Idempotent — the sealId path
+ * is deterministic, so retries after a partial stamp failure must overwrite, not conflict. */
 export async function uploadSeal(sealBlob: Blob, userId: string, sealId: string): Promise<string> {
   const safeSealId = sealId.replace(/[^a-zA-Z0-9._-]/g, '_');
   const path = `seals/${userId}/${safeSealId}.png`;
-  return uploadFile(sealBlob, path);
+  return uploadFile(sealBlob, path, true);
 }
 
 export async function uploadQuickSign(file: File, userId: string): Promise<string> {
@@ -79,7 +80,8 @@ export async function stampAndUpload(params: StampParams): Promise<StampResult> 
   const safeSealId = sealId.replace(/[^a-zA-Z0-9._-]/g, '_');
   const safeDocName = documentName.replace(/[^a-zA-Z0-9._-]/g, '_');
   const sealedPath = `sealed/${userId}/${safeSealId}-${safeDocName}.${ext}`;
-  await uploadFile(stampedBlob, sealedPath);
+  // Idempotent — same reasoning as uploadSeal, so retries can overwrite a partial upload.
+  await uploadFile(stampedBlob, sealedPath, true);
 
   return { sealPath, sealedPath };
 }

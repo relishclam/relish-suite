@@ -173,11 +173,12 @@ export default function SignReview() {
         },
       });
 
-      // Background: render seal + stamp document + update DB, retry once on failure
+      // Background: render seal + stamp document + update DB, retry a few times on failure
       const capturedId = sigRecord.id;
       const capturedSealId = sigRecord.seal_id;
       const capturedUserId = session.user.id;
       const capturedRequest = request;
+      const MAX_STAMP_ATTEMPTS = 3;
       ;(async function doStamp(attempt: number) {
         try {
           const sealBlob = await renderSeal({ signerName, sealId: capturedSealId, signedAt });
@@ -196,7 +197,7 @@ export default function SignReview() {
           }).eq('id', capturedId);
         } catch (err) {
           console.error(`Seal stamp attempt ${attempt + 1} failed:`, err);
-          if (attempt === 0) setTimeout(() => doStamp(1), 3000);
+          if (attempt + 1 < MAX_STAMP_ATTEMPTS) setTimeout(() => doStamp(attempt + 1), 3000 * (attempt + 1));
         }
       })(0);
     } catch (err) {
