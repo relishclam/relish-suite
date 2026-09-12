@@ -223,10 +223,19 @@ export default function SignReview() {
   }
 
   if (error) {
+    const needsEnroll = /re-enrol|signing key/i.test(error);
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white px-6 text-center">
         <img src="/Relish-Logo.png" alt="Relish" className="h-10 mb-6" />
         <p className="text-red-600 text-sm mb-6">{error}</p>
+        {needsEnroll && (
+          <button
+            onClick={() => navigate('/enroll')}
+            className="bg-relish-purple text-white rounded-lg py-2.5 px-6 font-semibold text-sm mb-3"
+          >
+            Set Up This Device
+          </button>
+        )}
         <button onClick={() => navigate('/history')} className="text-relish-purple text-sm underline">
           Back to Home
         </button>

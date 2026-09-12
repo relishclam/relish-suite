@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { getSession } from '../lib/auth';
 import { loadWebAuthnCredId, storeWebAuthnCredId } from '../lib/webauthn';
+import { loadPrivateKey } from '../lib/indexeddb';
 
 interface SignatureRecord {
   id: string;
@@ -45,15 +46,16 @@ export default function History() {
       setSignatures(sigResult.data ?? []);
 
       const keyRow = keyResult.data;
+      // DB can say "enrolled" while this specific device has no local private key
+      // (new phone, cleared storage, reinstalled browser) — that also needs re-enrollment.
+      const hasLocalKey = await loadPrivateKey();
       if (!keyRow) {
-        // No signing key at all — needs full enrollment
         setPasskeyOk(false);
-      } else if (keyRow.webauthn_credential_id) {
+      } else if (keyRow.webauthn_credential_id && hasLocalKey) {
         // Backfill localStorage if missing (e.g. enrolled before this fix)
         if (!loadWebAuthnCredId()) storeWebAuthnCredId(keyRow.webauthn_credential_id);
         setPasskeyOk(true);
       } else {
-        // Key exists but passkey was never registered
         setPasskeyOk(false);
       }
 
@@ -95,10 +97,10 @@ export default function History() {
         <div className="mx-4 mt-4 bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex items-start gap-3">
           <span className="text-xl mt-0.5">⚠️</span>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-amber-800">Biometric setup incomplete</p>
+            <p className="text-sm font-semibold text-amber-800">This device isn't set up to sign</p>
             <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
-              Your signing key exists but your device passkey was not saved.
-              Tap Fix to complete setup — takes 10 seconds.
+              No signing key/passkey was found on this device. Tap Fix to
+              set it up — takes 10 seconds.
             </p>
             <button
               onClick={() => navigate('/enroll')}
@@ -182,6 +184,13 @@ export default function History() {
             ))}
           </div>
         )}
+
+        <button
+          onClick={() => navigate('/enroll')}
+          className="w-full text-center text-xs text-gray-400 underline py-6"
+        >
+          Re-configure signing on this device
+        </button>
       </div>
     </div>
   );
