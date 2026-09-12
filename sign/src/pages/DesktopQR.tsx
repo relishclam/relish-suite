@@ -84,6 +84,29 @@ export default function DesktopQR() {
     return () => { supabase.removeChannel(channel); };
   }, [requestId]);
 
+  // Fallback poll — Realtime events can be silently dropped if the table isn't
+  // in the supabase_realtime publication, so don't rely on it exclusively.
+  useEffect(() => {
+    if (!requestId || view !== 'waiting') return;
+    const poll = setInterval(async () => {
+      const { data } = await supabase
+        .from('signing_requests')
+        .select('status')
+        .eq('id', requestId)
+        .single();
+      if (data?.status === 'signed') {
+        clearInterval(poll);
+        if (timerRef.current) clearInterval(timerRef.current);
+        await loadSignedResult(requestId);
+      } else if (data?.status === 'rejected') {
+        clearInterval(poll);
+        if (timerRef.current) clearInterval(timerRef.current);
+        setView('rejected');
+      }
+    }, 3000);
+    return () => clearInterval(poll);
+  }, [requestId, view]);
+
   // All hooks declared — now safe to guard
   if (!state) return <Navigate to="/history" replace />;
 
