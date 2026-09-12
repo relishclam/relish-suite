@@ -1,6 +1,10 @@
 import { supabase } from './supabase';
 import { renderSeal } from './seal';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 
 const BUCKET = 'relish-sign-docs';
 
@@ -75,10 +79,15 @@ export async function stampAndUpload(params: StampParams): Promise<StampResult> 
     } catch (err) {
       // Some PDFs (broken xref/trailer, incremental-update artifacts, certain encryption)
       // crash pdf-lib's page-tree parser (e.g. "catalog.Pages is not a function").
-      // Retrying never helps since it's deterministic — fall back to the original,
-      // unstamped document so the signature still completes instead of hanging forever.
-      console.warn('PDF stamping failed, falling back to unstamped original:', err);
-      stampedBlob = new Blob([docBytes], { type: 'application/pdf' });
+      // Retrying never helps since it's deterministic — fall back to rasterizing with
+      // pdf.js (far more tolerant of malformed PDFs) so the seal still ends up on the page.
+      console.warn('pdf-lib stamping failed, falling back to rasterized stamp:', err);
+      try {
+        stampedBlob = await stampPDFViaRasterize(docBytes, sealBlob);
+      } catch (rasterErr) {
+        console.warn('Rasterized stamping also failed, falling back to unstamped original:', rasterErr);
+        stampedBlob = new Blob([docBytes], { type: 'application/pdf' });
+      }
     }
     ext = 'pdf';
   } else {
@@ -133,6 +142,60 @@ export async function stampPDF(pdfBytes: ArrayBuffer, sealBlob: Blob): Promise<U
   );
 
   return pdfDoc.save();
+}
+
+/**
+ * Fallback for PDFs pdf-lib can't parse (broken xref/trailer, incremental-update
+ * artifacts, certain encryption). Renders each page to a raster image via pdf.js
+ * (far more tolerant of malformed PDFs) and rebuilds a fresh, well-formed PDF.
+ * Loses selectable text/vector content — visual-only, but the seal is guaranteed
+ * to be embedded.
+ */
+async function stampPDFViaRasterize(pdfBytes: ArrayBuffer, sealBlob: Blob): Promise<Blob> {
+  const RASTER_SCALE = 2;
+  const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+
+  const sealImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(sealBlob);
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Seal image load failed')); };
+    img.src = url;
+  });
+
+  const outDoc = await PDFDocument.create();
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({ scale: RASTER_SCALE });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d')!;
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    if (i === pdf.numPages) {
+      const sealPxW = SEAL_W_PT * RASTER_SCALE;
+      const sealPxH = SEAL_H_PT * RASTER_SCALE;
+      const x = canvas.width - sealPxW - SEAL_MARGIN_PT * RASTER_SCALE;
+      const y = canvas.height - SEAL_MARGIN_PT * RASTER_SCALE - sealPxH;
+      ctx.drawImage(sealImg, x, y, sealPxW, sealPxH);
+    }
+
+    const pageBlob = await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Canvas toBlob failed'))), 'image/png'),
+    );
+    const pageBytes = new Uint8Array(await pageBlob.arrayBuffer());
+    const embeddedImg = await outDoc.embedPng(pageBytes);
+
+    const ptWidth = viewport.width / RASTER_SCALE;
+    const ptHeight = viewport.height / RASTER_SCALE;
+    const outPage = outDoc.addPage([ptWidth, ptHeight]);
+    outPage.drawImage(embeddedImg, { x: 0, y: 0, width: ptWidth, height: ptHeight });
+  }
+
+  const bytes = await outDoc.save();
+  return new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' });
 }
 
 function stampImage(imageBytes: ArrayBuffer, sealBlob: Blob): Promise<Blob> {
