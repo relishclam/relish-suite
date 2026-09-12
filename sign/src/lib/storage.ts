@@ -69,8 +69,17 @@ export async function stampAndUpload(params: StampParams): Promise<StampResult> 
   let ext: string;
 
   if (documentType === 'pdf') {
-    const stamped = await stampPDF(docBytes, sealBlob);
-    stampedBlob = new Blob([stamped.buffer as ArrayBuffer], { type: 'application/pdf' });
+    try {
+      const stamped = await stampPDF(docBytes, sealBlob);
+      stampedBlob = new Blob([stamped.buffer as ArrayBuffer], { type: 'application/pdf' });
+    } catch (err) {
+      // Some PDFs (broken xref/trailer, incremental-update artifacts, certain encryption)
+      // crash pdf-lib's page-tree parser (e.g. "catalog.Pages is not a function").
+      // Retrying never helps since it's deterministic — fall back to the original,
+      // unstamped document so the signature still completes instead of hanging forever.
+      console.warn('PDF stamping failed, falling back to unstamped original:', err);
+      stampedBlob = new Blob([docBytes], { type: 'application/pdf' });
+    }
     ext = 'pdf';
   } else {
     stampedBlob = await stampImage(docBytes, sealBlob);
